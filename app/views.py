@@ -3,8 +3,8 @@ from django.http import HttpResponse
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Customer, Client
-from .serializers import CustomerSerializer, ClientSerializer
+from .models import Customer, Client, Campaign
+from .serializers import CustomerSerializer, ClientSerializer, CampaignSerializer
 from django.contrib.auth.hashers import check_password
 
 # Create your views here.
@@ -105,3 +105,21 @@ def login_view(request):
             "status": False,
             "message": "Invalid Email"
         }, status=404)
+    
+
+
+# Campaign 
+@api_view(['POST'])
+def create_campaign(request):
+    serializer = CampaignSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"status": True})
+    return Response(serializer.errors, status=400)
+
+
+@api_view(['GET'])
+def get_campaigns(request):
+    campaigns = Campaign.objects.all()
+    serializer = CampaignSerializer(campaigns, many=True)
+    return Response(serializer.data)

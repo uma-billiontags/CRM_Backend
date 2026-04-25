@@ -66,14 +66,14 @@ class Client(models.Model):
     user_email = models.EmailField(unique=True, blank=True, null=True)
     user_password = models.CharField(max_length=128, blank=True, null=True)
 
-    # ✅ FIXED SAVE METHOD
+    # FIXED SAVE METHOD
     def save(self, *args, **kwargs):
 
-        # 🔐 Hash password
+        # Hash password
         if self.user_password and not self.user_password.startswith('pbkdf2_'):
             self.user_password = make_password(self.user_password)
 
-        # 🔥 Generate Client ID
+        # Generate Client ID
         if not self.client_id:
             year = timezone.now().year
 
@@ -91,9 +91,152 @@ class Client(models.Model):
 
         super().save(*args, **kwargs)
 
-    # ✅ Correct position
+
     def __str__(self):
         return f"{self.client_id} - {self.client_name}"
+
+
+
+# CAMPAIGN TABLE
+
+
+
+class Campaign(models.Model):
+
+    # ── CHOICES ─────────────────────────────────────────────
+
+    CAMPAIGN_TYPE_CHOICES = [
+        ('Brand Awareness', 'Brand Awareness'),
+        ('Performance', 'Performance'),
+        ('Retargeting', 'Retargeting'),
+        ('Prospecting', 'Prospecting'),
+        ('Lead Generation', 'Lead Generation'),
+    ]
+
+    BUYING_TYPE_CHOICES = [
+        ('Programmatic (DV360)', 'Programmatic (DV360)'),
+        ('Direct', 'Direct'),
+        ('Programmatic Guaranteed', 'Programmatic Guaranteed'),
+        ('Preferred Deal', 'Preferred Deal'),
+        ('Open Auction', 'Open Auction'),
+    ]
+
+    OBJECTIVE_CHOICES = [
+        ('Increase Brand Awareness', 'Increase Brand Awareness'),
+        ('Drive Website Traffic', 'Drive Website Traffic'),
+        ('Generate Leads', 'Generate Leads'),
+        ('Boost Sales', 'Boost Sales'),
+        ('App Installs', 'App Installs'),
+    ]
+
+    PRIMARY_OBJ_CHOICES = [
+        ('Reach', 'Reach'),
+        ('Brand Awareness', 'Brand Awareness'),
+        ('Traffic', 'Traffic'),
+        ('Engagement', 'Engagement'),
+        ('Video Views', 'Video Views'),
+        ('Conversions', 'Conversions'),
+    ]
+
+    TARGET_AUDIENCE_CHOICES = [
+        ('General Market', 'General Market'),
+        ('Adults 18–35', 'Adults 18–35'),
+        ('Women 25–45', 'Women 25–45'),
+        ('Urban Youth', 'Urban Youth'),
+        ('Custom Segment', 'Custom Segment'),
+    ]
+
+    BRAND_SAFETY_CHOICES = [
+        ('Standard', 'Standard'),
+        ('Strict', 'Strict'),
+        ('Custom', 'Custom'),
+    ]
+
+    BUDGET_TYPE_CHOICES = [
+        ('total', 'Total Budget'),
+        ('daily', 'Daily Budget'),
+    ]
+
+    PACING_CHOICES = [
+        ('Even', 'Even'),
+        ('Front-Loaded', 'Front-Loaded'),
+        ('Back-Loaded', 'Back-Loaded'),
+        ('ASAP', 'ASAP'),
+    ]
+
+    DAY_PARTING_CHOICES = [
+        ('All Day', 'All Day'),
+        ('Business Hours (9am–6pm)', 'Business Hours (9am–6pm)'),
+        ('Prime Time (6pm–11pm)', 'Prime Time (6pm–11pm)'),
+        ('Custom', 'Custom'),
+    ]
+
+    TIMEZONE_CHOICES = [
+        ('Asia/Kolkata (IST)', 'Asia/Kolkata (IST)'),
+        ('UTC', 'UTC'),
+        ('America/New_York (EST)', 'America/New_York (EST)'),
+        ('Europe/London (GMT)', 'Europe/London (GMT)'),
+    ]
+
+    # ── STEP 1 : Client & Advertiser ───────────────────────
+
+    client = models.CharField(max_length=200)
+    advertiser = models.CharField(max_length=200)
+    business_unit = models.CharField(max_length=200, blank=True, null=True)
+
+    # ── STEP 2 : Campaign Details ──────────────────────────
+
+    campaign_name = models.CharField(max_length=300)
+    campaign_code = models.CharField(max_length=100, blank=True, null=True)
+    campaign_type = models.CharField(max_length=50, choices=CAMPAIGN_TYPE_CHOICES)
+    buying_type = models.CharField(max_length=60, choices=BUYING_TYPE_CHOICES)
+    objective = models.CharField(max_length=100, choices=OBJECTIVE_CHOICES)
+
+    kpis = models.CharField(max_length=500, blank=True, null=True)   # comma-separated
+    notes = models.TextField(blank=True, null=True)
+
+    # ── STEP 3 : Objectives & Settings ─────────────────────
+
+    primary_objective = models.CharField(max_length=50, choices=PRIMARY_OBJ_CHOICES)
+    target_audience = models.CharField(max_length=50, choices=TARGET_AUDIENCE_CHOICES)
+
+    geo_targeting = models.CharField(max_length=500)   # e.g: "India,Chennai"
+    platforms = models.CharField(max_length=500)       # e.g: "Google,Facebook"
+
+    frequency_cap = models.PositiveIntegerField(blank=True, null=True)
+    brand_safety = models.CharField(max_length=20, choices=BRAND_SAFETY_CHOICES)
+    viewability_goal = models.PositiveIntegerField(blank=True, null=True)
+
+    # ── STEP 4 : Budget & Schedule ─────────────────────────
+
+    budget_type = models.CharField(max_length=10, choices=BUDGET_TYPE_CHOICES)
+    total_budget = models.DecimalField(max_digits=14, decimal_places=2)
+
+    start_date = models.DateField()
+    end_date = models.DateField()
+
+    pacing = models.CharField(max_length=20, choices=PACING_CHOICES)
+    day_parting = models.CharField(max_length=50, choices=DAY_PARTING_CHOICES, blank=True, null=True)
+    timezone = models.CharField(max_length=50, choices=TIMEZONE_CHOICES, blank=True, null=True)
+
+    # ── META ───────────────────────────────────────────────
+
+    created_on = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_on']
+
+    # ── VALIDATION ─────────────────────────────────────────
+
+    def clean(self):
+        if self.end_date and self.start_date:
+            if self.end_date < self.start_date:
+                raise ValueError("End date must be greater than start date")
+
+    # ── STRING REPRESENTATION ──────────────────────────────
+
+    def __str__(self):
+        return f"{self.campaign_name} | {self.client} → {self.advertiser}"
 
 
 
