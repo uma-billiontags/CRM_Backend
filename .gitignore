@@ -11,5 +11,3 @@ venv/
 # Database (optional)
 db.sqlite3
 
-# SSL certificate (Aiven)
-ca.pem
