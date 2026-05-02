@@ -159,3 +159,19 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #print("DB_HOST:", os.getenv("DB_HOST"))
 
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = False
+
+AUTH_USER_MODEL = 'app.User'
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'ngrok-skip-browser-warning',  # ← add this
+]
