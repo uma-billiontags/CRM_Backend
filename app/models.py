@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 
 # ==============================
-# CUSTOM USER
+# CUSTOM USER MODEL 
 # ==============================
 class User(AbstractUser):
     ROLE_CHOICES = [
@@ -25,22 +25,22 @@ class User(AbstractUser):
 # ==============================
 def generate_client_id():
     year = datetime.now().year
-    last = Client.objects.filter(client_id__contains=str(year)).order_by('id').last()
+    last = Client.objects.filter(client_id__contains=str(year)).order_by('id').last() # Get last client of current year
 
     if last:
-        last_num = int(last.client_id.split('-')[-1])
-        new_num = last_num + 1
+        last_num = int(last.client_id.split('-')[-1]) # Extract last number from ID (00005 → 5)
+        new_num = last_num + 1 # Increment (eg: 5 ---> 5+1 = 6)
     else:
-        new_num = 1
+        new_num = 1 #  or else create the first client of the year
 
-    return f"CLT-{year}-{str(new_num).zfill(5)}"
+    return f"CLT-{year}-{str(new_num).zfill(5)}"  # CLT-2026-00001
 
 
 # ==============================
 # CLIENT (MAIN TABLE)
 # ==============================
 class Client(models.Model):
-    client_id = models.CharField(max_length=20, unique=True, editable=False)
+    client_id = models.CharField(max_length=20, unique=True, editable=False) # here auto generate ID and cannot edit
 
     # Basic Info
     name = models.CharField(max_length=200) # enter company name
@@ -72,14 +72,14 @@ class Client(models.Model):
 
     place_of_supply = models.CharField(max_length=100, blank=True)
 
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True) # It tells whether a client is active or inactive.
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def save(self, *args, **kwargs):
-        if not self.client_id:
+    def save(self, *args, **kwargs):  # Auto ID save
+        if not self.client_id:   # it checks the client is already have an ID
             self.client_id = generate_client_id()
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs)  # save() is a built-in Django method
 
     def __str__(self):
         return f"{self.name} ({self.client_id})"
@@ -89,8 +89,8 @@ class Client(models.Model):
 # BILLING & COMMERCIALS
 # ==============================
 class ClientBilling(models.Model):
-    #client = models.OneToOneField(Client, on_delete=models.CASCADE)
-    client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='billing')
+    #client = models.OneToOneField(Client, on_delete=models.CASCADE) related_name means access the data
+    client = models.OneToOneField(Client, on_delete=models.CASCADE, related_name='billing') #  that links one record in a model to exactly one record in another
 
 
     #pricing_model = models.CharField(max_length=100)
@@ -126,7 +126,7 @@ class ClientBilling(models.Model):
 
 
 class CompanyAddress(models.Model):
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="addresses")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="addresses") # it means one client have multiple addresses
 
     address_line1 = models.TextField()
     address_line2 = models.TextField(blank=True)
@@ -134,12 +134,12 @@ class CompanyAddress(models.Model):
     country = models.CharField(max_length=100)
     zipcode = models.CharField(max_length=10)
 
-    is_primary = models.BooleanField(default=False)
+    is_primary = models.BooleanField(default=False) # Is this the main (primary) address or not?
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-created_at']  # Whenever you fetch data, show the latest records first. - (minus sign) → descending order ---> (latest - oldest)
 
     def __str__(self):
         return f"{self.client.name} - {self.address_line1[:30]}"
@@ -163,12 +163,12 @@ class CompanyContact(models.Model):
     address_line1 = models.TextField(blank=True)
     address_line2 = models.TextField(blank=True)
     #digital_signature = models.TextField(null=True, blank=True)
-    digital_signature = models.FileField(upload_to="signatures/", null=True, blank=True)
+    digital_signature = models.FileField(upload_to="signatures/", null=True, blank=True) # it stores in media folder/signatures/image.png
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ['-created_at'] # it always shows the newest records first
 
     def __str__(self):
         return f"{self.name} - {self.client.name}"
@@ -241,9 +241,13 @@ class ClientClassification(models.Model):
 # --------------------------------------------------------------------------------
 
 
+# ==============================
+# CAMPAGIN MODEL 
+# ==============================
+
 class Campaign(models.Model):
 
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="campaigns")
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="campaigns") # link one client have multiple campagins
 
     advertiser = models.CharField(max_length=200)
     website_url = models.URLField(blank=True, null=True)
@@ -257,12 +261,9 @@ class Campaign(models.Model):
     buying_type = models.CharField(max_length=60)
     objective = models.CharField(max_length=100)
 
-    #  Auto-generated field
-    campaign_id = models.CharField(
-        max_length=100,
-        unique=True,
-        editable=False
-    )
+    # Auto-generated field
+
+    campaign_id = models.CharField(max_length=100,unique=True,editable=False) # auto generate campaign ID 
 
     notes = models.TextField(blank=True, null=True)
 
@@ -281,28 +282,27 @@ class Campaign(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-
-
     #  FIXED generator
     def generate_campaign_id(self):
         year = datetime.now().year
 
-        last = Campaign.objects.filter(
-            campaign_id__startswith=f"CMP-{year}"
-        ).order_by('id').last()
+        last = Campaign.objects.filter(campaign_id__startswith=f"CMP-{year}").order_by('id').last() # CMP-2026
 
-        if last and last.campaign_id:
-            last_num = int(last.campaign_id.split('-')[-1])
-            new_num = last_num + 1
+        if last and last.campaign_id:     #  if last campaign id is CMP-2026-00025
+            last_num = int(last.campaign_id.split('-')[-1]) # then split('-') → ['CMP', '2026', '00025'] & [-1] → '00025' & int(25)
+
+            new_num = last_num + 1 # 25 + 1 = 26 
         else:
-            new_num = 1
+            new_num = 1 # or else it create first campaign of the year
 
         return f"CMP-{year}-{str(new_num).zfill(5)}"
 
     # FIXED save method (INSIDE CLASS)
+
     def save(self, *args, **kwargs):
         if not self.campaign_id:
-            for i in range(5):
+           # to prevent duplicate IDs when multiple requests hit your server at the same time.
+            for i in range(5): 
                 with transaction.atomic():
                     new_id = self.generate_campaign_id()
                     if not Campaign.objects.filter(campaign_id=new_id).exists():
@@ -317,15 +317,16 @@ class Campaign(models.Model):
 # ==== Add Line Item ====
 
 class LineItem(models.Model):
-    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='line_items')
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='line_items', null=True, blank=True) # One campaign have multiple line items
 
+    line_item_id = models.CharField(max_length=50, unique=True, null=True, blank=True)
     line_item_name = models.CharField(max_length=300)
 
     # Better than comma-separated
     ethnicity = models.JSONField(blank=True, null=True)
 
-    start_date = models.DateField()
-    end_date = models.DateField()
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
 
     # multiple formats (image, video)
     ad_format = models.JSONField(blank=True, null=True)
@@ -333,6 +334,11 @@ class LineItem(models.Model):
     impressions = models.BigIntegerField(null=True, blank=True)
 
     landing_page = models.URLField(blank=True, null=True)
+    
+    units = models.BigIntegerField(null=True, blank=True)
+    ctr = models.IntegerField(null=True, blank=True)
+    viewability = models.IntegerField(null=True, blank=True)
+    vcr = models.IntegerField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -372,6 +378,8 @@ class LineItemCreative(models.Model):
         # Validate first
         self.full_clean()
 
+
+# Get file extension
         # Detect file type
         if self.file:
             ext = os.path.splitext(self.file.name)[1].lower()
@@ -387,3 +395,44 @@ class LineItemCreative(models.Model):
 
     def __str__(self):
         return f"{self.line_item.line_item_name} - {self.file.name}"
+    
+
+# ------------------------------------------------------------------
+
+class Creative(models.Model):
+    line_item = models.ForeignKey(
+        LineItem,
+        on_delete=models.CASCADE,
+        related_name='creatives_detail'
+    )
+
+    creative_name = models.CharField(max_length=300)
+
+    main_asset = models.FileField(upload_to='creatives/main/', blank=True, null=True)
+    backup_image = models.FileField(upload_to='creatives/backup/', blank=True, null=True)
+
+    # Auto-extracted from image
+    dimensions = models.CharField(max_length=50, blank=True)
+    aspect_ratio = models.CharField(max_length=20, blank=True)
+    file_size = models.CharField(max_length=30, blank=True)
+
+    # File metadata
+    main_asset_name = models.CharField(max_length=255, blank=True)
+    backup_image_name = models.CharField(max_length=255, blank=True)
+    #main_asset_mime = models.CharField(max_length=100, blank=True)
+    #backup_image_mime = models.CharField(max_length=100, blank=True)
+
+    # Extra fields from the table
+    click_through_url = models.URLField(blank=True, null=True)
+    appended_html_tag = models.TextField(blank=True)
+    integration_code = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"{self.creative_name} ({self.line_item.line_item_name})"
+    

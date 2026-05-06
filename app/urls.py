@@ -10,10 +10,11 @@ urlpatterns = [
     path('get_client/<str:client_id>/', views.get_client, name='get_client'),
     path('create_campaign/', views.create_campaign, name='create_campaign'),
     path('get_campaigns/', views.get_campaigns, name='get_campaigns'),
-    path('get_campaigns_by_client/<int:client_id>/', views.get_campaigns_by_client, name='get_campaigns_by_client'),
+    path('get_campaigns_by_client/<str:client_id>/', views.get_campaigns_by_client, name='get_campaigns_by_client'),
     path('get_campaign_by_id/<str:campaign_id>/', views.get_campaign_by_id, name='get_campaign_by_id'),
-    #path('bulk_create_campaigns/', views.bulk_create_campaigns, name='bulk_create_campaigns'),
-    #path('update_contact_signature/<int:contact_id>/', views.update_contact_signature, name='update_contact_signature')
+    path('upload_creatives/', views.upload_creatives, name='upload_creatives'),
+    path('get_creatives_by_line_item/<str:line_item_id>', views.get_creatives_by_line_item, name='get_creatives_by_line_item')
+
   
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
