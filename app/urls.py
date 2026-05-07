@@ -12,7 +12,7 @@ urlpatterns = [
     path('get_campaigns/', views.get_campaigns, name='get_campaigns'),
     path('get_campaigns_by_client/<str:client_id>/', views.get_campaigns_by_client, name='get_campaigns_by_client'),
     path('get_campaign_by_id/<str:campaign_id>/', views.get_campaign_by_id, name='get_campaign_by_id'),
-    path('upload_creatives/', views.upload_creatives, name='upload_creatives'),
+    #path('upload_creatives/', views.upload_creatives, name='upload_creatives'),
     path('get_creatives_by_line_item/<str:line_item_id>', views.get_creatives_by_line_item, name='get_creatives_by_line_item'),
   
 

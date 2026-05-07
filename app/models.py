@@ -413,7 +413,7 @@ class Creative(models.Model):
     backup_image = models.FileField(upload_to='creatives/backup/', blank=True, null=True)
 
     # AUTO FILE TYPE
-    file_type = models.CharField(max_length=20, blank=True)
+    #file_type = models.CharField(max_length=20, blank=True)
 
     # META DATA
     dimensions = models.CharField(max_length=50, blank=True)
@@ -421,8 +421,8 @@ class Creative(models.Model):
     file_size = models.CharField(max_length=30, blank=True)
 
     # FILE NAMES
-    main_asset_name = models.CharField(max_length=255, blank=True)
-    backup_image_name = models.CharField(max_length=255, blank=True)
+    #main_asset_name = models.CharField(max_length=255, blank=True)
+    #backup_image_name = models.CharField(max_length=255, blank=True)
 
     # EXTRA
     click_through_url = models.URLField(blank=True, null=True)
@@ -437,16 +437,6 @@ class Creative(models.Model):
 
     # AUTO DETECT FILE TYPE
     def save(self, *args, **kwargs):
-        if self.main_asset:
-            ext = os.path.splitext(self.main_asset.name)[1].lower()
-
-            if ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-                self.file_type = 'image'
-            elif ext in ['.mp4', '.mov', '.avi', '.mkv']:
-                self.file_type = 'video'
-            else:
-                self.file_type = 'unknown'
-
         super().save(*args, **kwargs)
 
     def __str__(self):
