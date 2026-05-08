@@ -270,50 +270,9 @@ class CreativeSerializer(serializers.ModelSerializer):
 # CREATIVE
 # ==============================
 
-# class CreativeSerializer(serializers.ModelSerializer):
-#     main_asset_url = serializers.SerializerMethodField()
-#     backup_image_url = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = Creative
-#         fields = [
-#             'id',
-#             'line_item',
-#             'creative_name',
-#             'main_asset',
-#             'main_asset_url',
-#             'main_asset_name',
-#             'backup_image',
-#             'backup_image_url',
-#             'backup_image_name',
-#             'dimensions',
-#             'aspect_ratio',
-#             'file_size',
-#             'click_through_url',
-#             'appended_html_tag',
-#             'integration_code',
-#             'notes',
-#             'uploaded_at',
-#         ]
-#         read_only_fields = ['uploaded_at', 'main_asset_url', 'backup_image_url']
-
-#     def get_main_asset_url(self, obj):
-#         request = self.context.get('request')
-#         if obj.main_asset and request:
-#             return request.build_absolute_uri(obj.main_asset.url)
-#         return None
-
-#     def get_backup_image_url(self, obj):
-#         request = self.context.get('request')
-#         if obj.backup_image and request:
-#             return request.build_absolute_uri(obj.backup_image.url)
-#         return None
-
-
-
 class CreativeSerializer(serializers.ModelSerializer):
     main_asset_url = serializers.SerializerMethodField()
-    backup_image_url = serializers.SerializerMethodField()
+    #backup_image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Creative
@@ -325,8 +284,8 @@ class CreativeSerializer(serializers.ModelSerializer):
             'main_asset',
             'main_asset_url',
 
-            'backup_image',
-            'backup_image_url',
+            #'backup_image',
+            #'backup_image_url',
 
             'dimensions',
             'aspect_ratio',
@@ -336,14 +295,12 @@ class CreativeSerializer(serializers.ModelSerializer):
             'appended_html_tag',
             'integration_code',
             'notes',
-
             'uploaded_at',
         ]
 
         read_only_fields = [
             'uploaded_at',
             'main_asset_url',
-            'backup_image_url'
         ]
 
     def get_main_asset_url(self, obj):
@@ -354,13 +311,13 @@ class CreativeSerializer(serializers.ModelSerializer):
 
         return None
 
-    def get_backup_image_url(self, obj):
-        request = self.context.get('request')
+    # def get_backup_image_url(self, obj):
+    #     request = self.context.get('request')
 
-        if obj.backup_image and request:
-            return request.build_absolute_uri(obj.backup_image.url)
+    #     if obj.backup_image and request:
+    #         return request.build_absolute_uri(obj.backup_image.url)
 
-        return None
+    #     return None
 
 
 
