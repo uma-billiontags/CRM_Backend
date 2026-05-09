@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response 
 from rest_framework import status
-from .models import Client, Campaign,LineItem,Creative
+from .models import Client, Campaign,LineItem,Creative, ThirdPartyCreative
 from .serializers import ClientSerializer, CampaignSerializer, CreativeSerializer
 import json
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -93,7 +93,7 @@ def get_all_clients(request):
 # CREATE CAMPAIGN
 # ==============================
 
-
+'''
 # Creates a custom function to convert frontend date string into Python date.
 def parse_date(date_str):
     if not date_str:
@@ -195,10 +195,324 @@ def create_campaign(request):
         "campaign_id": campaign.campaign_id,
     }, status=201)
 
+'''
+
+
+
+
+# =========================================================
+# CONVERT FRONTEND DATE STRING TO PYTHON DATE
+#==========================================================
+
+
+
+# =========================================================
+# DATE PARSER
+# =========================================================
+
+def parse_date(date_str):
+
+    if not date_str:
+        return None
+
+    return datetime.fromisoformat(
+        date_str.replace('Z', '')
+    ).date()
+
+
+# =========================================================
+# CREATE CAMPAIGN
+# =========================================================
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+
+def create_campaign(request):
+
+    # =====================================================
+    # GET CLIENT ID
+    # =====================================================
+
+    client_id = request.data.get('client')
+
+    if not client_id:
+
+        return Response(
+            {"error": "client is required"},
+            status=400
+        )
+
+    # =====================================================
+    # FIND CLIENT
+    # =====================================================
+
+    try:
+
+        client = Client.objects.get(
+            client_id=client_id
+        )
+
+    except Client.DoesNotExist:
+
+        return Response(
+            {"error": f"Client '{client_id}' not found"},
+            status=404
+        )
+
+    # =====================================================
+    # VALIDATE CAMPAIGN
+    # =====================================================
+
+    serializer = CampaignSerializer(
+        data=request.data
+    )
+
+    if not serializer.is_valid():
+
+        return Response(
+            serializer.errors,
+            status=400
+        )
+
+    try:
+
+        # =================================================
+        # SAVE EVERYTHING INSIDE TRANSACTION
+        # =================================================
+
+        with transaction.atomic():
+
+            # =============================================
+            # SAVE CAMPAIGN
+            # =============================================
+
+            campaign = serializer.save(
+                client=client
+            )
+
+            # =============================================
+            # GET LINE ITEMS JSON
+            # =============================================
+
+            try:
+
+                line_items_data = json.loads(
+                    request.data.get(
+                        'line_items',
+                        '[]'
+                    )
+                )
+
+            except Exception:
+
+                return Response(
+                    {"error": "Invalid line_items JSON"},
+                    status=400
+                )
+
+            # =============================================
+            # LOOP LINE ITEMS
+            # =============================================
+
+            for i, li in enumerate(line_items_data):
+
+                line_item_id = li.get(
+                    'line_item_id'
+                )
+
+                if not line_item_id:
+                    continue
+
+                # =========================================
+                # CREATE / UPDATE LINE ITEM
+                # =========================================
+
+                line_item, _ = LineItem.objects.update_or_create(
+
+                    line_item_id=line_item_id,
+
+                    defaults={
+
+                        'campaign': campaign,
+
+                        'line_item_name': li.get(
+                            'lineItemName'
+                        ),
+
+                        'ethnicity': li.get(
+                            'ethnicity',
+                            []
+                        ),
+
+                        'start_date': parse_date(
+                            li.get('startDate')
+                        ),
+
+                        'end_date': parse_date(
+                            li.get('endDate')
+                        ),
+
+                        'ad_format': li.get(
+                            'adFormat',
+                            []
+                        ),
+
+                        'impressions': li.get(
+                            'impressions'
+                        ) or None,
+
+                        'units': li.get(
+                            'units'
+                        ) or None,
+
+                        'ctr': li.get(
+                            'ctr'
+                        ) or None,
+
+                        'viewability': li.get(
+                            'viewability'
+                        ) or None,
+
+                        'vcr': li.get(
+                            'vcr'
+                        ) or None,
+                    }
+                )
+
+                # =========================================
+                # GET CREATIVES
+                # =========================================
+
+                creatives_meta = li.get(
+                    'creatives',
+                    []
+                )
+
+                # =========================================
+                # LOOP CREATIVES
+                # =========================================
+
+                for j, meta in enumerate(creatives_meta):
+
+                    # =====================================
+                    # THIRD PARTY CREATIVE
+                    # =====================================
+
+                    if meta.get('type') == 'third_party':
+
+                        input_file = request.FILES.get(
+                            f'line_item_{i}thirdparty_file{j}'
+                        )
+
+                        backup_image = request.FILES.get(
+                            f'line_item_{i}thirdparty_backup{j}'
+                        )
+
+                        ThirdPartyCreative.objects.create(
+
+                            line_item=line_item,
+
+                            input_file=input_file,
+
+                            backup_image=backup_image,
+                        )
+
+                    # =====================================
+                    # NORMAL CREATIVE
+                    # =====================================
+
+                    else:
+
+                        # Skip if no creative name
+                        if not meta.get(
+                            'creative_name'
+                        ):
+                            continue
+
+                        # ===============================
+                        # GET FILE
+                        # ===============================
+
+                        main_asset = request.FILES.get(
+                            f'line_item_{i}main_asset{j}'
+                        )
+
+                        # ===============================
+                        # SAVE CREATIVE
+                        # ===============================
+
+                        Creative.objects.create(
+
+                            line_item=line_item,
+
+                            creative_name=meta.get(
+                                'creative_name',
+                                ''
+                            ),
+
+                            main_asset=main_asset,
+
+                            dimensions=meta.get(
+                                'dimensions',
+                                ''
+                            ),
+
+                            aspect_ratio=meta.get(
+                                'aspect_ratio',
+                                ''
+                            ),
+
+                            file_size=meta.get(
+                                'file_size',
+                                ''
+                            ),
+
+                            click_through_url=meta.get(
+                                'click_through_url'
+                            ) or None,
+
+                            appended_html_tag=meta.get(
+                                'appended_html_tag',
+                                ''
+                            ),
+
+                            integration_code=meta.get(
+                                'integration_code',
+                                ''
+                            ),
+
+                            notes=meta.get(
+                                'notes',
+                                ''
+                            ),
+                        )
+
+    except Exception as e:
+
+        return Response(
+            {"error": str(e)},
+            status=500
+        )
+
+    # =====================================================
+    # SUCCESS RESPONSE
+    # =====================================================
+
+    return Response({
+
+        "message": (
+            "Campaign + LineItem + "
+            "Creative + ThirdPartyCreative "
+            "saved successfully"
+        ),
+
+        "campaign_id": campaign.campaign_id,
+
+    }, status=201)
 
 #===========================
 # GET ALL CAMPAIGNS
-# ==============================
+# ==========================
 
 @api_view(['GET'])
 def get_campaigns(request):

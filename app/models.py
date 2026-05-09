@@ -397,3 +397,23 @@ class Creative(models.Model):
 
 
 
+# ==============================
+# THIRD PARTY CREATIVE
+# ==============================
+
+class ThirdPartyCreative(models.Model):
+
+    line_item = models.ForeignKey(LineItem,on_delete=models.CASCADE,related_name='third_party_creatives')
+    # ZIP / HTML / TXT / DOCX / XLSX
+    input_file = models.FileField(upload_to='thirdparty/files/',blank=True,null=True)
+
+    # Backup image
+    backup_image = models.FileField(upload_to='thirdparty/backup/',blank=True,null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"ThirdPartyCreative ({self.line_item.line_item_name})"
+

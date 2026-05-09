@@ -311,15 +311,53 @@ class CreativeSerializer(serializers.ModelSerializer):
 
         return None
 
-    # def get_backup_image_url(self, obj):
-    #     request = self.context.get('request')
+  
 
-    #     if obj.backup_image and request:
-    #         return request.build_absolute_uri(obj.backup_image.url)
+# ==============================
+# THIRD PARTY CREATIVE
+# ==============================
 
-    #     return None
+class ThirdPartyCreativeSerializer(serializers.ModelSerializer):
 
+    input_file_url = serializers.SerializerMethodField()
+    backup_image_url = serializers.SerializerMethodField()
 
+    class Meta:
+        model = ThirdPartyCreative
+
+        fields = [
+            'id',
+            'line_item',
+            'input_file',
+            'input_file_url',
+            'backup_image',
+            'backup_image_url',
+            'uploaded_at',
+        ]
+
+        read_only_fields = [
+            'uploaded_at',
+            'input_file_url',
+            'backup_image_url',
+        ]
+
+    def get_input_file_url(self, obj):
+
+        request = self.context.get('request')
+
+        if obj.input_file and request:
+            return request.build_absolute_uri(obj.input_file.url)
+
+        return None
+
+    def get_backup_image_url(self, obj):
+
+        request = self.context.get('request')
+
+        if obj.backup_image and request:
+            return request.build_absolute_uri(obj.backup_image.url)
+
+        return None
 
 
 # ==============================
@@ -331,6 +369,11 @@ class LineItemSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True,
         source='creatives_detail'   # 🔥 matches model
+    )
+
+    third_party_creatives = ThirdPartyCreativeSerializer(
+        many=True,
+        read_only=True,
     )
 
     class Meta:
