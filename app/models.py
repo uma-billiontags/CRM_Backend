@@ -260,6 +260,8 @@ class Campaign(models.Model):
     campaign_type = models.CharField(max_length=50)
     buying_type = models.CharField(max_length=60)
     objective = models.CharField(max_length=100)
+    start_date = models.DateField()
+    end_date = models.DateField()
 
     # Auto-generated field
     campaign_id = models.CharField(max_length=100,unique=True,editable=False) # auto generate campaign ID 
@@ -416,4 +418,7 @@ class ThirdPartyCreative(models.Model):
 
     def __str__(self):
         return f"ThirdPartyCreative ({self.line_item.line_item_name})"
+
+
+
 

@@ -12,9 +12,10 @@ urlpatterns = [
     path('get_campaigns/', views.get_campaigns, name='get_campaigns'),
     path('get_campaigns_by_client/<str:client_id>/', views.get_campaigns_by_client, name='get_campaigns_by_client'),
     path('get_campaign_by_id/<str:campaign_id>/', views.get_campaign_by_id, name='get_campaign_by_id'),
-
+    path('update_campaign/<str:campaign_id>/',views.update_campaign, name='update_campaign')
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
 
 
 
