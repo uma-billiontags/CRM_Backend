@@ -343,8 +343,9 @@ class LineItem(models.Model):
     vcr = models.FloatField(null=True, blank=True)
 
     # add unit costs and kpi notes
-    unit_cost = models.FloatField(null=True, blank=True)
+    unit_cost = models.CharField(max_length=100,null=True, blank=True)
     kpi_notes = models.TextField(null=True, blank=True)
+    unit_value = models.FloatField(null=True, blank=True)
 
    
 
@@ -427,5 +428,6 @@ class ThirdPartyCreative(models.Model):
         return f"ThirdPartyCreative ({self.line_item.line_item_name})"
 
 
+# ------------------------------------------------------------------------- 
 
 

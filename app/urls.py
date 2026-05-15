@@ -14,7 +14,9 @@ urlpatterns = [
     path('get_campaign_by_id/<str:campaign_id>/', views.get_campaign_by_id, name='get_campaign_by_id'),
     path('update_campaign/<str:campaign_id>/',views.update_campaign, name='update_campaign'),
     path('login_view/', views.login_view, name='login_view'),
-    path('download_creative/<int:creative_id>/', views.download_creative, name='download_creative')
+    path('download_creative/<int:creative_id>/', views.download_creative, name='download_creative'),
+    path('download_thirdparty/<int:thirdparty_id>/', views.download_thirdparty, name='download_thirdparty'),
+    path('download_backup_image/<int:thirdparty_id>/', views.download_backup_image, name='download_backup_image')
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

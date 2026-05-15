@@ -11,6 +11,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Prefetch
 from django.db import transaction  # imports Django transaction management system.
 from datetime import datetime
+from django.contrib.auth.hashers import make_password
 
 # ==============================
 # Home function 
@@ -21,30 +22,135 @@ def home(request):
 # ==============================
 # DEFINE CLIENT FUNCTION
 # ==============================
+
+
+# @api_view(['POST'])
+# def create_client(request):
+#     signatures = {
+#         key: request.FILES[key]
+#         for key in request.FILES
+#         if key.startswith('contact_signature_')
+#     }
+
+#     # Unwrap JSON from FormData "data" field
+#     raw = request.data.get('data')
+#     if raw:
+#         parsed = json.loads(raw)
+#         data = parsed
+#     else:
+#         data = request.data
+
+#     serializer = ClientSerializer(
+#         data=data,
+#         context={'signatures': signatures}
+#     )
+#     if serializer.is_valid():
+#         serializer.save()
+#         return Response({"message": "Client created successfully"}, status=201)
+#     return Response(serializer.errors, status=400)
+
+
+
+# ---------- client function ---------------
+
+
 @api_view(['POST'])
 def create_client(request):
+
     signatures = {
+
         key: request.FILES[key]
+
         for key in request.FILES
-        if key.startswith('contact_signature_')
+
+        if key.startswith(
+            'contact_signature_'
+        )
     }
 
-    # Unwrap JSON from FormData "data" field
+    # Unwrap JSON from FormData
     raw = request.data.get('data')
+
     if raw:
+
         parsed = json.loads(raw)
+
         data = parsed
+
     else:
+
         data = request.data
 
     serializer = ClientSerializer(
+
         data=data,
-        context={'signatures': signatures}
+
+        context={
+            'signatures': signatures
+        }
     )
+
+    # =========================================
+    # VALIDATION
+    # =========================================
+
     if serializer.is_valid():
-        serializer.save()
-        return Response({"message": "Client created successfully"}, status=201)
-    return Response(serializer.errors, status=400)
+
+        # Save client
+        client = serializer.save()
+
+        # =====================================
+        # GET EMAIL FROM CLIENT
+        # =====================================
+
+        email = client.email
+
+        # =====================================
+        # CREATE USER LOGIN
+        # =====================================
+
+        if email and not User.objects.filter(
+            email=email
+        ).exists():
+
+            user = User.objects.create(
+
+                username=email,
+
+                email=email,
+
+                role='client',
+
+                client=client
+            )
+
+            # Default password
+            user.set_password("123")
+
+            user.save()
+
+        return Response({
+
+            "message":
+            "Client created successfully",
+
+            "default_password":
+            "123"
+
+        }, status=201)
+
+    return Response(
+        serializer.errors,
+        status=400
+    )
+
+
+
+
+
+
+
+
 
 
 # ==============================
@@ -164,6 +270,7 @@ def create_campaign(request):
                         'vcr': li.get('vcr') or None,
                         'unit_cost': li.get('unit_cost') or None,
                         'kpi_notes': li.get('kpi_notes', ''),
+                        'unit_value': li.get('unit_value') or None,
 
                     }
                 )
@@ -406,6 +513,7 @@ def update_campaign(request, campaign_id):
                         'vcr': li.get('vcr') or None,
                         'unit_cost': li.get('unit_cost') or None,
                         'kpi_notes': li.get('kpi_notes', ''),
+                        'unit_value': li.get('unit_value') or None,
 
                     }
                 )
@@ -577,4 +685,33 @@ def download_creative(request, creative_id):
     file_path = creative.main_asset.path
 
     # Return downloadable response
-    return FileResponse(open(file_path, 'rb'),as_attachment=True,filename=creative.main_asset.name)
+    return FileResponse(open(file_path, 'rb'),as_attachment=True,filename=creative.main_asset.name) 
+
+
+# Third party function
+@api_view(['GET'])
+def download_thirdparty(request,thirdparty_id):
+
+    # Get third-party creative object
+    thirdparty = get_object_or_404(ThirdPartyCreative,id=thirdparty_id)
+
+    if not thirdparty.input_file:
+        return Response({"error":"No input file uploaded"},status=404)
+
+    # Get uploaded file path
+    file_path = thirdparty.input_file.path
+
+    # Return downloadable response
+    return FileResponse(open(file_path, 'rb'),as_attachment=True,filename=thirdparty.input_file.name)
+
+
+# Backup image function
+@api_view(['GET'])
+def download_backup_image(request,thirdparty_id):
+
+    thirdparty = get_object_or_404(ThirdPartyCreative,id=thirdparty_id)
+
+    if not thirdparty.backup_image:
+        return Response({"error":"No input file uploaded"},status=404)
+    file_path = thirdparty.backup_image.path
+    return FileResponse(open(file_path, 'rb'),as_attachment=True,filename=thirdparty.backup_image.name)
