@@ -16,7 +16,11 @@ urlpatterns = [
     path('login_view/', views.login_view, name='login_view'),
     path('download_creative/<int:creative_id>/', views.download_creative, name='download_creative'),
     path('download_thirdparty/<int:thirdparty_id>/', views.download_thirdparty, name='download_thirdparty'),
-    path('download_backup_image/<int:thirdparty_id>/', views.download_backup_image, name='download_backup_image')
+    path('download_backup_image/<int:thirdparty_id>/', views.download_backup_image, name='download_backup_image'),
+    path('get_clients_for_approval/', views.get_clients_for_approval, name='get_clients_for_approval'),
+    path('approve_client/', views.approve_client, name='approve_client'),
+    path('get_approval_details/<str:client_id>/', views.get_approval_details, name='get_approval_details'),
+
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

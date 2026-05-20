@@ -242,4 +242,69 @@ class CampaignSerializer(serializers.ModelSerializer):
         read_only_fields = ['campaign_id']
 
 
-    
+# --------------------------------------------------------------------
+
+# ==============================
+# SUPERADMIN SERIALIZER
+# ==============================
+
+class SuperAdminSerializer(serializers.ModelSerializer):
+
+    # ==========================
+    # FETCH CLIENT DETAILS
+    # ==========================
+
+    client_id = serializers.CharField(
+
+        source='client.client_id',
+
+        read_only=True
+    )
+
+    client_name = serializers.CharField(
+
+        source='client.name',
+
+        read_only=True
+    )
+
+    client_email = serializers.EmailField(
+
+        source='client.email',
+
+        read_only=True
+    )
+
+    class Meta:
+
+        model = SuperAdmin
+
+        fields = [
+
+            'id',
+
+            'client',
+
+            'client_id',
+
+            'client_name',
+
+            'client_email',
+
+            'approval_status',
+
+            'client_password',
+
+            'email_sent',
+
+            'approved_at',
+
+            'created_at',
+        ]
+
+        read_only_fields = [
+
+            'approved_at',
+
+            'created_at',
+        ]

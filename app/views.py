@@ -4,7 +4,7 @@ from django.http import HttpResponse
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response 
 from rest_framework import status
-from .models import Client, Campaign,LineItem,Creative, ThirdPartyCreative
+from .models import Client, Campaign,LineItem,Creative, ThirdPartyCreative, SuperAdmin
 from .serializers import ClientSerializer, CampaignSerializer
 import json
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -630,38 +630,134 @@ def update_campaign(request, campaign_id):
 from django.contrib.auth import authenticate
 from app.models import User
 
+# @api_view(['POST'])
+# def login_view(request):
+
+#     email = request.data.get('email')
+#     password = request.data.get('password')
+
+#     try:
+#         user_obj = User.objects.get(email=email)
+
+#     except User.DoesNotExist:
+
+#         return Response({"error": "Invalid email"},status=401)
+
+#     user = authenticate(
+#         username=user_obj.username,
+#         password=password
+#     )
+#     if user is None:
+#         return Response({"error": "Invalid password"},status=401)
+
+#     return Response({
+#         "message": "Login successful",
+
+#         "user": {
+#             "id": user.id,
+#             "username": user.username,
+#             "email": user.email,
+#             "role": user.role,   
+#             "client_id": user.client.client_id if user.client else None, 
+#         }
+
+#     }, status=200)
+
+
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import SuperAdmin
+
+
 @api_view(['POST'])
 def login_view(request):
 
+    # =====================================
+    # GET DATA
+    # =====================================
+
     email = request.data.get('email')
+
     password = request.data.get('password')
 
+    # =====================================
+    # VALIDATION
+    # =====================================
+
+    if not email or not password:
+
+        return Response({
+
+            "error":
+            "Email and password are required"
+
+        }, status=400)
+
+    # =====================================
+    # FIND APPROVED CLIENT
+    # =====================================
+
     try:
-        user_obj = User.objects.get(email=email)
 
-    except User.DoesNotExist:
+        approval = SuperAdmin.objects.select_related(
+            'client'
+        ).get(
 
-        return Response({"error": "Invalid email"},status=401)
+            client__email=email,
 
-    user = authenticate(
-        username=user_obj.username,
-        password=password
-    )
-    if user is None:
-        return Response({"error": "Invalid password"},status=401)
+            approval_status='approved'
+        )
+
+    except SuperAdmin.DoesNotExist:
+
+        return Response({
+
+            "error":
+            "Account not approved or email not found"
+
+        }, status=401)
+
+    # =====================================
+    # CHECK PASSWORD
+    # =====================================
+
+    if approval.client_password != password:
+
+        return Response({
+
+            "error":
+            "Invalid password"
+
+        }, status=401)
+
+    # =====================================
+    # SUCCESS RESPONSE
+    # =====================================
 
     return Response({
+
         "message": "Login successful",
 
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,   
-            "client_id": user.client.client_id if user.client else None, 
+        "client": {
+
+            "client_id":
+            approval.client.client_id,
+
+            "company_name":
+            approval.client.name,
+
+            "email":
+            approval.client.email,
+
+            "approval_status":
+            approval.approval_status,
         }
 
     }, status=200)
+
+
+
 
 
 # ------------------ Download function ----------------------
@@ -710,3 +806,198 @@ def download_backup_image(request,thirdparty_id):
         return Response({"error":"No input file uploaded"},status=404)
     file_path = thirdparty.backup_image.path
     return FileResponse(open(file_path, 'rb'),as_attachment=True,filename=thirdparty.backup_image.name)
+
+
+# ===================================
+# Write the logic for superadmin function
+
+from .serializers import SuperAdminSerializer
+
+from django.core.mail import send_mail
+
+from django.utils import timezone
+
+
+# ==============================
+# GET ALL CLIENTS FOR APPROVAL
+# ==============================
+
+@api_view(['GET'])
+def get_clients_for_approval(request):
+
+    clients = Client.objects.all().order_by(
+        '-created_at'
+    )
+
+    data = []
+
+    for client in clients:
+
+        approval = SuperAdmin.objects.filter(
+            client=client
+        ).first()
+
+        data.append({
+
+            "client_id": client.client_id,
+
+            "company_name": client.name,
+
+            "email": client.email,
+
+            "phone": client.phone,
+
+            "approval_status":
+
+                approval.approval_status
+
+                if approval else "pending"
+        })
+
+    return Response(data)
+
+
+# ==============================
+# APPROVE CLIENT
+# ==============================
+
+@api_view(['POST'])
+def approve_client(request):
+
+    client_id = request.data.get(
+        'client_id'
+    )
+
+    password = request.data.get(
+        'password'
+    )
+
+    # =====================================
+    # VALIDATION
+    # =====================================
+
+    if not client_id or not password:
+
+        return Response({
+
+            "error":
+            "client_id and password required"
+
+        }, status=400)
+
+    # =====================================
+    # GET CLIENT
+    # =====================================
+
+    try:
+
+        client = Client.objects.get(
+            client_id=client_id
+        )
+
+    except Client.DoesNotExist:
+
+        return Response({
+
+            "error": "Client not found"
+
+        }, status=404)
+
+    # =====================================
+    # SAVE APPROVAL
+    # =====================================
+
+    approval, created = SuperAdmin.objects.update_or_create(
+
+        client=client,
+
+        defaults={
+
+            'approval_status': 'approved',
+
+            'client_password': password,
+
+            'email_sent': True,
+
+            'approved_at': timezone.now()
+        }
+    )
+
+    # =====================================
+    # SEND EMAIL
+    # =====================================
+
+    send_mail(
+
+        subject='CRM Login Credentials',
+
+        message=f'''
+Hello {client.name},
+
+Your CRM account has been approved.
+
+Login Email:
+{client.email}
+
+Password:
+{password}
+
+You can now login and create campaigns.
+
+Thank You
+''',
+
+        from_email='yourgmail@gmail.com',
+
+        recipient_list=[client.email],
+
+        fail_silently=False
+    )
+
+    # =====================================
+    # RESPONSE
+    # =====================================
+
+    serializer = SuperAdminSerializer(
+        approval
+    )
+
+    return Response({
+
+        "message":
+        "Client approved successfully",
+
+        "data":
+        serializer.data
+
+    }, status=200)
+
+
+# ==============================
+# GET APPROVAL DETAILS
+# ==============================
+
+@api_view(['GET'])
+def get_approval_details(request, client_id):
+
+    try:
+
+        approval = SuperAdmin.objects.select_related(
+            'client'
+        ).get(
+            client__client_id=client_id
+        )
+
+    except SuperAdmin.DoesNotExist:
+
+        return Response({
+
+            "error": "Approval details not found"
+
+        }, status=404)
+
+    serializer = SuperAdminSerializer(
+        approval
+    )
+
+    return Response(serializer.data)
