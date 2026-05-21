@@ -641,45 +641,23 @@ def login_view(request):
 
     # FIND USER
     try:
-        user_obj = User.objects.get(email=email)
-
+        user_obj = User.objects.get(email=email) # searches the user in db using email
     except User.DoesNotExist:
-
-        return Response({
-
-            "error":
-            "Invalid email"
-
-        }, status=401)
+        return Response({"error":"Invalid email"}, status=401)
 
     # AUTHENTICATE
-    user = authenticate(
-
+    user = authenticate(  # verifies the password & username using django built-in authentication system.
         username=user_obj.username,
-
         password=password
     )
 
     if user is None:
-
-        return Response({
-
-            "error":
-            "Invalid password"
-
-        }, status=401)
+        return Response({"error":"Invalid password"}, status=401)
 
     # CHECK CLIENT APPROVAL
-    if user.role == 'client':
-
-        if user.client.status != 'approved':
-
-            return Response({
-
-                "error":
-                "Your account is not approved yet"
-
-            }, status=403)
+    if user.role == 'client':   # check if the logged user is client
+        if user.client.status != 'approved':  # check the client approvel status
+            return Response({"error":"Your account is not approved yet"}, status=403)
 
     return Response({
 

@@ -447,47 +447,10 @@ class ThirdPartyCreative(models.Model):
 
 # ------------------------------------------------------------------------- 
 
-
-# class SuperAdmin(models.Model):
-
-#     # Link with client
-#     client = models.OneToOneField(Client,on_delete=models.CASCADE,related_name='superadmin_approval')
-
-#     # Approval status
-#     APPROVAL_STATUS = [('pending', 'Pending'),('approved', 'Approved'),('rejected', 'Rejected'),]
-
-#     approval_status = models.CharField(max_length=20,choices=APPROVAL_STATUS,default='pending')
-
-#     # Password given by superadmin
-#     client_password = models.CharField(max_length=200)
-
-    
-#     # Email sent or not
-#     email_sent = models.BooleanField(default=False)
-
-#     # Approval time
-#     approved_at = models.DateTimeField(null=True,blank=True)
-
-#     # Record created time
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     def __str__(self):
-#         return (f"{self.client.client_id} - "f"{self.approval_status}")
-
-
 # -------- Team Access Model -----------
-
-
-from django.db import models
-
 
 class TeamAccess(models.Model):
 
-    ROLE_CHOICES = [
-        ('Admin', 'Admin'),
-        ('Manager', 'Manager'),
-        ('Employee', 'Employee'),
-    ]
 
     STATUS_CHOICES = [
         ('Active', 'Active'),
@@ -496,7 +459,7 @@ class TeamAccess(models.Model):
 
     member = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=50, choices=ROLE_CHOICES)
+    role = models.CharField(max_length=50)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Active')
     password = models.CharField(max_length=255)
     last_active = models.DateTimeField(auto_now=True)
