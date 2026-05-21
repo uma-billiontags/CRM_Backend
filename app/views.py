@@ -4,14 +4,19 @@ from django.http import HttpResponse
 from rest_framework.decorators import api_view, parser_classes
 from rest_framework.response import Response 
 from rest_framework import status
-from .models import Client, Campaign,LineItem,Creative, ThirdPartyCreative, SuperAdmin
-from .serializers import ClientSerializer, CampaignSerializer
+from .models import Client, Campaign,LineItem,Creative, ThirdPartyCreative, Client, User, TeamAccess
+from .serializers import ClientSerializer, CampaignSerializer, TeamAccessSerializer
 import json
 from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Prefetch
 from django.db import transaction  # imports Django transaction management system.
 from datetime import datetime
 from django.contrib.auth.hashers import make_password
+from rest_framework.decorators import api_view
+from django.contrib.auth import authenticate
+
+
+
 
 # ==============================
 # Home function 
@@ -68,7 +73,6 @@ def create_client(request):
         )
     }
 
-    # Unwrap JSON from FormData
     raw = request.data.get('data')
 
     if raw:
@@ -90,30 +94,18 @@ def create_client(request):
         }
     )
 
-    # =========================================
-    # VALIDATION
-    # =========================================
-
     if serializer.is_valid():
 
-        # Save client
         client = serializer.save()
-
-        # =====================================
-        # GET EMAIL FROM CLIENT
-        # =====================================
 
         email = client.email
 
-        # =====================================
-        # CREATE USER LOGIN
-        # =====================================
-
+        # CREATE USER ONLY
         if email and not User.objects.filter(
             email=email
         ).exists():
 
-            user = User.objects.create(
+            User.objects.create(
 
                 username=email,
 
@@ -121,21 +113,13 @@ def create_client(request):
 
                 role='client',
 
-                client=client  # links every user with their own Client object.
+                client=client
             )
-
-            # Default password
-            user.set_password("123")
-
-            user.save()
 
         return Response({
 
             "message":
-            "Client created successfully",
-
-            "default_password":
-            "123"
+            "Client created successfully"
 
         }, status=201)
 
@@ -143,6 +127,26 @@ def create_client(request):
         serializer.errors,
         status=400
     )
+
+
+# To update the client function for approvel
+@api_view(['PATCH'])
+def update_client_status(request, client_id):
+    try:
+        client = Client.objects.get(client_id=client_id)
+    except Client.DoesNotExist:
+        return Response({"error": "Client not found"}, status=404)
+
+    status = request.data.get('status')
+    if status not in ['pending', 'approved', 'rejected']:
+        return Response({"error": "Invalid status"}, status=400)
+
+    client.status = status
+    client.save()
+    return Response({"message": f"Client status updated to {status}"}, status=200)
+
+
+
 
 
 
@@ -627,102 +631,36 @@ def update_campaign(request, campaign_id):
 
 # ------------- Login functionality ---------------
 
-from django.contrib.auth import authenticate
-from app.models import User
-
-# @api_view(['POST'])
-# def login_view(request):
-
-#     email = request.data.get('email')
-#     password = request.data.get('password')
-
-#     try:
-#         user_obj = User.objects.get(email=email)
-
-#     except User.DoesNotExist:
-
-#         return Response({"error": "Invalid email"},status=401)
-
-#     user = authenticate(
-#         username=user_obj.username,
-#         password=password
-#     )
-#     if user is None:
-#         return Response({"error": "Invalid password"},status=401)
-
-#     return Response({
-#         "message": "Login successful",
-
-#         "user": {
-#             "id": user.id,
-#             "username": user.username,
-#             "email": user.email,
-#             "role": user.role,   
-#             "client_id": user.client.client_id if user.client else None, 
-#         }
-
-#     }, status=200)
-
-
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from .models import SuperAdmin
-
-
 @api_view(['POST'])
 def login_view(request):
 
-    # =====================================
-    # GET DATA
-    # =====================================
-
-    email = request.data.get('email')
-
+    email = request.data.get('email') # get the email and password from frontend request body
     password = request.data.get('password')
-
-    # =====================================
-    # VALIDATION
-    # =====================================
-
     if not email or not password:
+        return Response({"error":"Email and password are required"}, status=400)
 
-        return Response({
-
-            "error":
-            "Email and password are required"
-
-        }, status=400)
-
-    # =====================================
-    # FIND APPROVED CLIENT
-    # =====================================
-
+    # FIND USER
     try:
+        user_obj = User.objects.get(email=email)
 
-        approval = SuperAdmin.objects.select_related(
-            'client'
-        ).get(
-
-            client__email=email,
-
-            approval_status='approved'
-        )
-
-    except SuperAdmin.DoesNotExist:
+    except User.DoesNotExist:
 
         return Response({
 
             "error":
-            "Account not approved or email not found"
+            "Invalid email"
 
         }, status=401)
 
-    # =====================================
-    # CHECK PASSWORD
-    # =====================================
+    # AUTHENTICATE
+    user = authenticate(
 
-    if approval.client_password != password:
+        username=user_obj.username,
+
+        password=password
+    )
+
+    if user is None:
 
         return Response({
 
@@ -731,31 +669,41 @@ def login_view(request):
 
         }, status=401)
 
-    # =====================================
-    # SUCCESS RESPONSE
-    # =====================================
+    # CHECK CLIENT APPROVAL
+    if user.role == 'client':
+
+        if user.client.status != 'approved':
+
+            return Response({
+
+                "error":
+                "Your account is not approved yet"
+
+            }, status=403)
 
     return Response({
 
         "message": "Login successful",
 
-        "client": {
+        "user": {
 
-            "client_id":
-            approval.client.client_id,
+            "id": user.id,
 
-            "company_name":
-            approval.client.name,
+            "username": user.username,
 
-            "email":
-            approval.client.email,
+            "email": user.email,
 
-            "approval_status":
-            approval.approval_status,
+            "role": user.role,
+
+            "client_id": (
+
+                user.client.client_id
+
+                if user.client else None
+            )
         }
 
     }, status=200)
-
 
 
 
@@ -809,68 +757,25 @@ def download_backup_image(request,thirdparty_id):
 
 
 # ===================================
-# Write the logic for superadmin function
+# APPROVAL FUNCTIONALITY
+# ===============================
 
-from .serializers import SuperAdminSerializer
+
 
 from django.core.mail import send_mail
-
 from django.utils import timezone
 
-
-# ==============================
-# GET ALL CLIENTS FOR APPROVAL
-# ==============================
-
-@api_view(['GET'])
-def get_clients_for_approval(request):
-
-    clients = Client.objects.all().order_by(
-        '-created_at'
-    )
-
-    data = []
-
-    for client in clients:
-
-        approval = SuperAdmin.objects.filter(
-            client=client
-        ).first()
-
-        data.append({
-
-            "client_id": client.client_id,
-
-            "company_name": client.name,
-
-            "email": client.email,
-
-            "phone": client.phone,
-
-            "approval_status":
-
-                approval.approval_status
-
-                if approval else "pending"
-        })
-
-    return Response(data)
-
-
-# ==============================
-# APPROVE CLIENT
-# ==============================
 
 @api_view(['POST'])
 def approve_client(request):
 
-    client_id = request.data.get(
-        'client_id'
-    )
+    # =====================================
+    # GET DATA FROM FRONTEND
+    # =====================================
 
-    password = request.data.get(
-        'password'
-    )
+    client_id = request.data.get('client_id')
+
+    password = request.data.get('password')
 
     # =====================================
     # VALIDATION
@@ -899,32 +804,59 @@ def approve_client(request):
 
         return Response({
 
-            "error": "Client not found"
+            "error":
+            "Client not found"
 
         }, status=404)
 
     # =====================================
-    # SAVE APPROVAL
+    # CREATE USER IF NOT EXISTS
     # =====================================
 
-    approval, created = SuperAdmin.objects.update_or_create(
+    user, created = User.objects.get_or_create(
 
-        client=client,
+        email=client.email,
 
         defaults={
 
-            'approval_status': 'approved',
+            "username": client.client_id,
 
-            'client_password': password,
+            "email": client.email,
 
-            'email_sent': True,
+            "role": "client",
 
-            'approved_at': timezone.now()
+            "client": client
         }
     )
 
     # =====================================
-    # SEND EMAIL
+    # UPDATE USER DETAILS
+    # =====================================
+
+    user.username = client.email   # client.email  (or) client.client_id
+
+    user.email = client.email
+
+    user.role = "client"
+
+    user.client = client
+
+    # SET PASSWORD (HASH PASSWORD)
+    user.set_password(password)
+
+    # SAVE USER
+    user.save()
+
+    # =====================================
+    # UPDATE CLIENT STATUS
+    # =====================================
+
+    client.status = "approved"
+
+    client.save()
+
+    # =====================================
+    # SEND LOGIN EMAIL
     # =====================================
 
     send_mail(
@@ -934,7 +866,7 @@ def approve_client(request):
         message=f'''
 Hello {client.name},
 
-Your CRM account has been approved.
+Your account has been approved.
 
 Login Email:
 {client.email}
@@ -943,7 +875,6 @@ Password:
 {password}
 
 You can now login and create campaigns.
-
 Thank You
 ''',
 
@@ -955,49 +886,87 @@ Thank You
     )
 
     # =====================================
-    # RESPONSE
+    # SUCCESS RESPONSE
     # =====================================
-
-    serializer = SuperAdminSerializer(
-        approval
-    )
 
     return Response({
 
         "message":
         "Client approved successfully",
 
-        "data":
-        serializer.data
+        "client_id":
+        client.client_id,
+
+        "email":
+        client.email,
+
+        "status":
+        client.status
 
     }, status=200)
 
 
-# ==============================
-# GET APPROVAL DETAILS
-# ==============================
+# ---------------------------
 
+# Create Team Member
+@api_view(['POST'])
+def create_team_member(request):
+
+    serializer = TeamAccessSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Get All Team Members
 @api_view(['GET'])
-def get_approval_details(request, client_id):
+def get_team_members(request):
 
-    try:
-
-        approval = SuperAdmin.objects.select_related(
-            'client'
-        ).get(
-            client__client_id=client_id
-        )
-
-    except SuperAdmin.DoesNotExist:
-
-        return Response({
-
-            "error": "Approval details not found"
-
-        }, status=404)
-
-    serializer = SuperAdminSerializer(
-        approval
-    )
+    members = TeamAccess.objects.all().order_by('-id')
+    serializer = TeamAccessSerializer(members, many=True)
 
     return Response(serializer.data)
+
+
+# Edit Team Member
+@api_view(['PUT'])
+def edit_team_member(request, id):
+
+    try:
+        member = TeamAccess.objects.get(id=id)
+    except TeamAccess.DoesNotExist:
+        return Response(
+            {"error": "Team member not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = TeamAccessSerializer(member, data=request.data, partial=True)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Delete Team Member
+@api_view(['DELETE'])
+def delete_team_member(request, id):
+
+    try:
+        member = TeamAccess.objects.get(id=id)
+    except TeamAccess.DoesNotExist:
+        return Response(
+            {"error": "Team member not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    member.delete()
+
+    return Response(
+        {"message": "Team member deleted successfully"},
+        status=status.HTTP_200_OK
+    )

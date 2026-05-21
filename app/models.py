@@ -10,7 +10,8 @@ class User(AbstractUser):
     ROLE_CHOICES = [
         ('superadmin', 'Super Admin'),
         ('client', 'Client'),
-        ('creative', 'Creative')
+        ('creative', 'Creative'),
+        ('admin', 'Admin'),
     ]
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
@@ -75,7 +76,19 @@ class Client(models.Model):
 
     is_active = models.BooleanField(default=True) # It tells whether a client is active or inactive.
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True) 
+
+    # In your Client model, add:
+    STATUS_CHOICES = [
+        ('pending',  'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending'
+    )
 
     def save(self, *args, **kwargs):  # Auto ID save
         if not self.client_id:   # it checks the client is already have an ID
@@ -234,10 +247,14 @@ class ClientClassification(models.Model):
     additional_internal_notes = models.CharField(max_length=500, blank=True, null=True)
     additional_tags = models.CharField(max_length=400, blank=True, null=True)
 
+    
+
 
     def __str__(self):
         return f"Classification - {self.client.name}"
     
+
+
 
 # --------------------------------------------------------------------------------
 
@@ -431,39 +448,60 @@ class ThirdPartyCreative(models.Model):
 # ------------------------------------------------------------------------- 
 
 
-# ==============================
-# SUPERADMIN APPROVAL MODEL
-# ==============================
+# class SuperAdmin(models.Model):
 
-class SuperAdmin(models.Model):
+#     # Link with client
+#     client = models.OneToOneField(Client,on_delete=models.CASCADE,related_name='superadmin_approval')
 
-    # Link with client
-    client = models.OneToOneField(Client,on_delete=models.CASCADE,related_name='superadmin_approval')
+#     # Approval status
+#     APPROVAL_STATUS = [('pending', 'Pending'),('approved', 'Approved'),('rejected', 'Rejected'),]
 
-    # Approval status
-    APPROVAL_STATUS = [('pending', 'Pending'),('approved', 'Approved'),('rejected', 'Rejected'),]
+#     approval_status = models.CharField(max_length=20,choices=APPROVAL_STATUS,default='pending')
 
-    approval_status = models.CharField(max_length=20,choices=APPROVAL_STATUS,default='pending')
-
-    # Password given by superadmin
-    client_password = models.CharField(max_length=200)
+#     # Password given by superadmin
+#     client_password = models.CharField(max_length=200)
 
     
-    # Email sent or not
-    email_sent = models.BooleanField(default=False)
+#     # Email sent or not
+#     email_sent = models.BooleanField(default=False)
 
-    # Approval time
-    approved_at = models.DateTimeField(null=True,blank=True)
+#     # Approval time
+#     approved_at = models.DateTimeField(null=True,blank=True)
 
-    # Record created time
-    created_at = models.DateTimeField(auto_now_add=True)
+#     # Record created time
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return (f"{self.client.client_id} - "f"{self.approval_status}")
+
+
+# -------- Team Access Model -----------
+
+
+from django.db import models
+
+
+class TeamAccess(models.Model):
+
+    ROLE_CHOICES = [
+        ('Admin', 'Admin'),
+        ('Manager', 'Manager'),
+        ('Employee', 'Employee'),
+    ]
+
+    STATUS_CHOICES = [
+        ('Active', 'Active'),
+        ('Inactive', 'Inactive'),
+    ]
+
+    member = models.CharField(max_length=100)
+    email = models.EmailField(unique=True)
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Active')
+    password = models.CharField(max_length=255)
+    last_active = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return (f"{self.client.client_id} - "f"{self.approval_status}")
-
-
-
-
-
+        return self.member
 
 

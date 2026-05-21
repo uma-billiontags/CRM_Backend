@@ -244,67 +244,14 @@ class CampaignSerializer(serializers.ModelSerializer):
 
 # --------------------------------------------------------------------
 
-# ==============================
-# SUPERADMIN SERIALIZER
-# ==============================
+# serializers.py
 
-class SuperAdminSerializer(serializers.ModelSerializer):
+from rest_framework import serializers
+from .models import TeamAccess
 
-    # ==========================
-    # FETCH CLIENT DETAILS
-    # ==========================
 
-    client_id = serializers.CharField(
-
-        source='client.client_id',
-
-        read_only=True
-    )
-
-    client_name = serializers.CharField(
-
-        source='client.name',
-
-        read_only=True
-    )
-
-    client_email = serializers.EmailField(
-
-        source='client.email',
-
-        read_only=True
-    )
+class TeamAccessSerializer(serializers.ModelSerializer):
 
     class Meta:
-
-        model = SuperAdmin
-
-        fields = [
-
-            'id',
-
-            'client',
-
-            'client_id',
-
-            'client_name',
-
-            'client_email',
-
-            'approval_status',
-
-            'client_password',
-
-            'email_sent',
-
-            'approved_at',
-
-            'created_at',
-        ]
-
-        read_only_fields = [
-
-            'approved_at',
-
-            'created_at',
-        ]
+        model = TeamAccess
+        fields = '__all__'

@@ -6,6 +6,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('home/', views.home, name='home'),
     path('create_client/', views.create_client, name='create_client'),
+    path('update_client_status/<str:client_id>/', views.update_client_status, name='update_client_status'),
     path('get_all_clients/', views.get_all_clients, name='get_all_clients'),
     path('get_client/<str:client_id>/', views.get_client, name='get_client'),
     path('create_campaign/', views.create_campaign, name='create_campaign'),
@@ -17,10 +18,13 @@ urlpatterns = [
     path('download_creative/<int:creative_id>/', views.download_creative, name='download_creative'),
     path('download_thirdparty/<int:thirdparty_id>/', views.download_thirdparty, name='download_thirdparty'),
     path('download_backup_image/<int:thirdparty_id>/', views.download_backup_image, name='download_backup_image'),
-    path('get_clients_for_approval/', views.get_clients_for_approval, name='get_clients_for_approval'),
+    #path('get_clients_for_approval/', views.get_clients_for_approval, name='get_clients_for_approval'),
     path('approve_client/', views.approve_client, name='approve_client'),
-    path('get_approval_details/<str:client_id>/', views.get_approval_details, name='get_approval_details'),
-
+    #path('get_approval_details/<str:client_id>/', views.get_approval_details, name='get_approval_details'),
+    path('create_team_member/', views.create_team_member, name='create_team_member'),
+    path('get_team_members/', views.get_team_members, name='get_team_members'),
+    path('edit_team_member/<int:id>/', views.edit_team_member, name='edit_team_member'),
+    path('delete_team_member/<int:id>/', views.delete_team_member, name='delete_team_member'),  
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
