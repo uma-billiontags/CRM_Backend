@@ -17,6 +17,7 @@ class User(AbstractUser):
 
     # Link user to client
     client = models.ForeignKey('Client', on_delete=models.CASCADE, null=True, blank=True)
+    status = models.CharField(max_length=20,default='active')
 
     def __str__(self):
         return self.username

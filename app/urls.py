@@ -25,6 +25,11 @@ urlpatterns = [
     path('get_team_members/', views.get_team_members, name='get_team_members'),
     path('edit_team_member/<int:id>/', views.edit_team_member, name='edit_team_member'),
     path('delete_team_member/<int:id>/', views.delete_team_member, name='delete_team_member'),  
+    path('get_client_users/', views.get_client_users, name='get_client_users'),
+    path('delete_client_user/<int:id>/', views.delete_client_user, name='delete_client_user'),
+    path('edit_client_user/<int:id>/', views.edit_client_user, name='edit_client_user'),
+    path('delete_campaign/<str:campaign_id>/', views.delete_campaign, name='delete_campaign'),
+    
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

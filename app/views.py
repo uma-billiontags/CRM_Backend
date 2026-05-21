@@ -14,7 +14,7 @@ from datetime import datetime
 from django.contrib.auth.hashers import make_password
 from rest_framework.decorators import api_view
 from django.contrib.auth import authenticate
-
+from django.utils import timezone
 
 
 
@@ -629,62 +629,162 @@ def update_campaign(request, campaign_id):
 
     }, status=200) 
 
-# ------------- Login functionality ---------------
 
-@api_view(['POST'])
-def login_view(request):
 
-    email = request.data.get('email') # get the email and password from frontend request body
-    password = request.data.get('password')
-    if not email or not password:
-        return Response({"error":"Email and password are required"}, status=400)
 
-    # FIND USER
+# =========================================================
+# DELETE CAMPAIGN
+# =========================================================
+
+@api_view(['DELETE'])
+def delete_campaign(request, campaign_id):
+
+    # =====================================================
+    # FIND CAMPAIGN
+    # =====================================================
+
     try:
-        user_obj = User.objects.get(email=email) # searches the user in db using email
-    except User.DoesNotExist:
-        return Response({"error":"Invalid email"}, status=401)
 
-    # AUTHENTICATE
-    user = authenticate(  # verifies the password & username using django built-in authentication system.
-        username=user_obj.username,
-        password=password
-    )
+        campaign = Campaign.objects.get(
+            campaign_id=campaign_id
+        )
 
-    if user is None:
-        return Response({"error":"Invalid password"}, status=401)
+    except Campaign.DoesNotExist:
 
-    # CHECK CLIENT APPROVAL
-    if user.role == 'client':   # check if the logged user is client
-        if user.client.status != 'approved':  # check the client approvel status
-            return Response({"error":"Your account is not approved yet"}, status=403)
+        return Response({
+
+            "error": "Campaign not found"
+
+        }, status=404)
+
+    # =====================================================
+    # DELETE CAMPAIGN
+    # =====================================================
+
+    campaign.delete()
+
+    # =====================================================
+    # SUCCESS RESPONSE
+    # =====================================================
 
     return Response({
 
-        "message": "Login successful",
+        "message": "Campaign deleted successfully",
 
-        "user": {
-
-            "id": user.id,
-
-            "username": user.username,
-
-            "email": user.email,
-
-            "role": user.role,
-
-            "client_id": (
-
-                user.client.client_id
-
-                if user.client else None
-            )
-        }
+        "campaign_id": campaign_id
 
     }, status=200)
 
+# ------------- Login functionality ---------------
+
+# @api_view(['POST'])
+# def login_view(request):
+
+#     email = request.data.get('email') # get the email and password from frontend request body
+#     password = request.data.get('password')
+#     if not email or not password:
+#         return Response({"error":"Email and password are required"}, status=400)
+
+#     # FIND USER
+#     try:
+#         user_obj = User.objects.get(email=email) # searches the user in db using email
+#     except User.DoesNotExist:
+#         return Response({"error":"Invalid email"}, status=401)
+
+#     # AUTHENTICATE
+#     user = authenticate(  # verifies the password & username using django built-in authentication system.
+#         username=user_obj.username,
+#         password=password
+#     )
+
+#     if user is None:
+#         return Response({"error":"Invalid password"}, status=401)
+    
+#     # UPDATE LAST LOGIN TIME
+#     user.last_login = timezone.now()
+#     user.save()
+
+#     # CHECK CLIENT APPROVAL
+#     if user.role == 'client':   # check if the logged user is client
+#         if user.client.status != 'approved':  # check the client approvel status
+#             return Response({"error":"Your account is not approved yet"}, status=403)
+
+#     return Response({
+
+#         "message": "Login successful",
+#         "user": {
+#             "id": user.id,
+#             "username": user.username,
+#             "email": user.email,
+#             "role": user.role,
+#             "client_id": (user.client.client_id if user.client else None)# If user linked with client: return client id otherwise return None # If user linked with client: return client id otherwise return None 
+#         }
+#     }, status=200)
 
 
+
+@api_view(['POST'])
+def login_view(request):
+    email = request.data.get('email') # get the email and password from frontend request body
+    password = request.data.get('password')
+
+    if not email or not password:
+        return Response({"error": "Email and password are required"}, status=400) 
+
+    # ── 1. Check TeamAccess table first (team members) ──────────────────────
+    try:
+        team_member = TeamAccess.objects.get(email=email)
+
+        if team_member.status != 'Active':
+            return Response({"error": "Your account is inactive. Contact your administrator."}, status=403)
+
+        if team_member.password != password:
+            return Response({"error": "Invalid password"}, status=401)
+
+        return Response({
+            "message": "Login successful",
+            "user": {
+                "id":        team_member.id,
+                "username":  team_member.member,
+                "email":     team_member.email,
+                "role":      team_member.role,
+                "client_id": None,
+                "source":    "team",
+            }
+        }, status=200)
+
+    except TeamAccess.DoesNotExist:
+        pass  # not a team member, check user table next
+
+    # ── 2. Check User table (clients + superadmin) ───────────────────────────
+    try:
+        user_obj = User.objects.get(email=email)   # searches the user in db using email
+    except User.DoesNotExist:
+        return Response({"error": "No account found with this email"}, status=401)
+
+    user = authenticate(username=user_obj.username, password=password)   # verifies the password & username using django built-in authentication system
+    if user is None:
+        return Response({"error": "Invalid password"}, status=401)
+    
+    # UPDATE LAST LOGIN TIME    
+    user.last_login = timezone.now()
+    user.save()
+    
+    if user.role == 'client':   # check if the logged user is client
+        if user.client is None or user.client.status != 'approved':      # check the client approvel status
+            return Response({"error": "Your account is not approved yet"}, status=403)
+
+    return Response({
+        "message": "Login successful",
+        "user": {
+            "id":        user.id,
+            "username":  user.username,
+            "email":     user.email,
+            "role":      user.role,
+            "client_id": user.client.client_id if user.client else None,     # If user linked with client: return client id otherwise return None
+            "source":    "user",
+        }
+    }, status=200)
 
 # ------------------ Download function ----------------------
 
@@ -734,15 +834,10 @@ def download_backup_image(request,thirdparty_id):
     return FileResponse(open(file_path, 'rb'),as_attachment=True,filename=thirdparty.backup_image.name)
 
 
-# ===================================
+# ===============================
 # APPROVAL FUNCTIONALITY
 # ===============================
-
-
-
 from django.core.mail import send_mail
-from django.utils import timezone
-
 
 @api_view(['POST'])
 def approve_client(request):
@@ -771,7 +866,6 @@ def approve_client(request):
     # =====================================
     # GET CLIENT
     # =====================================
-
     try:
 
         client = Client.objects.get(
@@ -885,6 +979,8 @@ Thank You
 
 
 # ---------------------------
+# TEAM MEMBER MANAGEMENT
+# ---------------------------
 
 # Create Team Member
 @api_view(['POST'])
@@ -948,3 +1044,122 @@ def delete_team_member(request, id):
         {"message": "Team member deleted successfully"},
         status=status.HTTP_200_OK
     )
+
+
+# ---------------------------
+# USER MANAGEMENT
+# ---------------------------
+
+# GET all client users
+@api_view(['GET'])
+def get_client_users(request):
+    users = User.objects.filter(role='client').select_related('client')
+    data = []
+    for u in users:
+        data.append({
+            "id": u.id,
+            "client_id": u.client.client_id if u.client else u.username,
+            "email": u.email,
+            "role": u.role,
+            "status": getattr(u, 'status', 'Active'),  # once you add status field
+            "last_active": u.last_login.isoformat() if u.last_login else u.date_joined.isoformat(),
+        })
+    return Response(data)
+
+# @api_view(['DELETE'])
+# def delete_client_user(request, id):
+#     try:
+#         user = User.objects.get(id=id, role='client')
+#     except User.DoesNotExist:
+#         return Response({"error": "Client user not found"}, status=404)
+#     user.delete()
+#     return Response({"message": "Deleted successfully"}, status=200)
+
+
+
+@api_view(['DELETE'])
+def delete_client_user(request, id):
+
+    # =====================================
+    # FIND CLIENT USER
+    # =====================================
+
+    try:
+
+        user = User.objects.select_related(
+            'client'
+        ).get(
+
+            id=id,
+
+            role='client'
+        )
+
+    except User.DoesNotExist:
+
+        return Response({
+
+            "error":
+            "Client user not found"
+
+        }, status=404)
+
+    # =====================================
+    # STORE DETAILS
+    # =====================================
+
+    client = user.client
+
+    deleted_data = {
+
+        "user_id": user.id,
+
+        "email": user.email,
+
+        "client_id": (
+
+            client.client_id
+            if client else None
+        )
+    }
+
+    # =====================================
+    # DELETE CLIENT TABLE
+    # =====================================
+
+    if client:
+
+        client.delete()
+
+    # =====================================
+    # SUCCESS RESPONSE
+    # =====================================
+
+    return Response({
+
+        "message":
+        "Client and user deleted successfully",
+
+        "deleted_data":
+        deleted_data
+
+    }, status=200)
+
+
+@api_view(['PUT'])
+def edit_client_user(request, id):
+    try:
+        user = User.objects.get(id=id)
+    except User.DoesNotExist:
+        return Response({"error": "User not found"}, status=404)
+
+    password = request.data.get('password')
+    status = request.data.get('status')
+
+    if password:
+        user.set_password(password)
+    if status:
+        user.status = status   # add this field to User model first
+
+    user.save()
+    return Response({"message": "Updated successfully"}, status=200)
