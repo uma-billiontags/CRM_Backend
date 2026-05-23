@@ -15,6 +15,8 @@ from django.contrib.auth.hashers import make_password
 from rest_framework.decorators import api_view
 from django.contrib.auth import authenticate
 from django.utils import timezone
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 
 
@@ -29,34 +31,78 @@ def home(request):
 # ==============================
 
 
+
+
 # @api_view(['POST'])
 # def create_client(request):
+
 #     signatures = {
+
 #         key: request.FILES[key]
+
 #         for key in request.FILES
-#         if key.startswith('contact_signature_')
+
+#         if key.startswith(
+#             'contact_signature_'
+#         )
 #     }
 
-#     # Unwrap JSON from FormData "data" field
 #     raw = request.data.get('data')
+
 #     if raw:
+
 #         parsed = json.loads(raw)
+
 #         data = parsed
+
 #     else:
+
 #         data = request.data
 
 #     serializer = ClientSerializer(
+
 #         data=data,
-#         context={'signatures': signatures}
+
+#         context={
+#             'signatures': signatures
+#         }
 #     )
+
 #     if serializer.is_valid():
-#         serializer.save()
-#         return Response({"message": "Client created successfully"}, status=201)
-#     return Response(serializer.errors, status=400)
 
+#         client = serializer.save()
 
+        
 
-# ---------- client function ---------------
+#         email = client.email
+
+#         # CREATE USER ONLY
+#         if email and not User.objects.filter(
+#             email=email
+#         ).exists():
+
+#             User.objects.create(
+
+#                 username=email,
+
+#                 email=email,
+
+#                 role='client',
+
+#                 client=client
+#             )
+
+#         return Response({
+
+#             "message":
+#             "Client created successfully"
+
+#         }, status=201)
+
+#     return Response(
+#         serializer.errors,
+#         status=400
+#     )
 
 
 @api_view(['POST'])
@@ -96,11 +142,18 @@ def create_client(request):
 
     if serializer.is_valid():
 
+        # =====================================
+        # SAVE CLIENT
+        # =====================================
+
         client = serializer.save()
 
         email = client.email
 
-        # CREATE USER ONLY
+        # =====================================
+        # CREATE USER
+        # =====================================
+
         if email and not User.objects.filter(
             email=email
         ).exists():
@@ -116,6 +169,28 @@ def create_client(request):
                 client=client
             )
 
+        # =====================================
+        # REALTIME NOTIFICATION
+        # =====================================
+
+        channel_layer = get_channel_layer()
+
+        async_to_sync(
+            channel_layer.group_send
+        )(
+            "notifications",
+            {
+                "type": "send_notification",
+
+                "message":
+                f"New client onboard submitted: {client.name}"
+            }
+        )
+
+        # =====================================
+        # SUCCESS RESPONSE
+        # =====================================
+
         return Response({
 
             "message":
@@ -127,6 +202,7 @@ def create_client(request):
         serializer.errors,
         status=400
     )
+
 
 
 # To update the client function for approvel
@@ -790,7 +866,7 @@ def login_view(request):
 
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
-
+import mimetypes
 
 @api_view(['GET'])
 def download_creative(request, creative_id):
@@ -800,9 +876,13 @@ def download_creative(request, creative_id):
 
     # Get uploaded file path
     file_path = creative.main_asset.path
+    
+    mime_type, _ = mimetypes.guess_type(file_path)
+    mime_type = mime_type or 'application/octet-stream'
+
 
     # Return downloadable response
-    return FileResponse(open(file_path, 'rb'),as_attachment=True,filename=creative.main_asset.name) 
+    return FileResponse(open(file_path, 'rb'),as_attachment=False,content_type=mime_type) 
 
 
 # Third party function

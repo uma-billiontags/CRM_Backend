@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'app', 
     'rest_framework',
     'corsheaders',
+    'channels',   # enabled websocket support     
 ]
 
 MIDDLEWARE = [
@@ -196,3 +197,23 @@ EMAIL_HOST_USER = 'charulatha@billiontags.co'
 EMAIL_HOST_PASSWORD = 'evjc dkwt eezb rvqk'
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+# Django Notifications  
+
+ASGI_APPLICATION = 'CRM_Backend.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+
+        "CONFIG": {
+            "hosts": [("127.0.0.1", 6379)],
+        },
+    },
+}
+
+
+
+
+# Frontend  ←→  WebSocket  ←→  Django Channels  ←→  Redis
