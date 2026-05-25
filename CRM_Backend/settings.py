@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',   # enabled websocket support     
+    'daphne',
 ]
 
 MIDDLEWARE = [
@@ -202,6 +203,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # Django Notifications  
 
 ASGI_APPLICATION = 'CRM_Backend.asgi.application'
+
 
 CHANNEL_LAYERS = {
     "default": {

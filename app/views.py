@@ -30,9 +30,6 @@ def home(request):
 # DEFINE CLIENT FUNCTION
 # ==============================
 
-
-
-
 # @api_view(['POST'])
 # def create_client(request):
 
@@ -70,13 +67,18 @@ def home(request):
 
 #     if serializer.is_valid():
 
-#         client = serializer.save()
+#         # =====================================
+#         # SAVE CLIENT
+#         # =====================================
 
-        
+#         client = serializer.save()
 
 #         email = client.email
 
-#         # CREATE USER ONLY
+#         # =====================================
+#         # CREATE USER
+#         # =====================================
+
 #         if email and not User.objects.filter(
 #             email=email
 #         ).exists():
@@ -92,6 +94,28 @@ def home(request):
 #                 client=client
 #             )
 
+#         # =====================================
+#         # REALTIME NOTIFICATION
+#         # =====================================
+
+#         channel_layer = get_channel_layer()
+
+#         async_to_sync(
+#             channel_layer.group_send
+#         )(
+#             "notifications",
+#             {
+#                 "type": "send_notification",
+
+#                 "message":
+#                 f"New client onboard submitted: {client.name}"
+#             }
+#         )
+
+#         # =====================================
+#         # SUCCESS RESPONSE
+#         # =====================================
+
 #         return Response({
 
 #             "message":
@@ -105,103 +129,192 @@ def home(request):
 #     )
 
 
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+from .serializers import ClientSerializer
+from .models import User
+
+import json
+
 @api_view(['POST'])
 def create_client(request):
 
     signatures = {
-
         key: request.FILES[key]
-
         for key in request.FILES
-
-        if key.startswith(
-            'contact_signature_'
-        )
+        if key.startswith('contact_signature_')
     }
 
     raw = request.data.get('data')
 
     if raw:
-
         parsed = json.loads(raw)
-
         data = parsed
-
     else:
-
         data = request.data
 
+    # =========================
+    # PRINT REQUEST DATA
+    # =========================
+
+    print("\n========== NEW CLIENT SUBMITTED ==========")
+
+    print("Client Name :", data.get("name"))
+    print("Email       :", data.get("email"))
+    print("Phone       :", data.get("phone"))
+    print("Company     :", data.get("company_type"))
+    print("Industry    :", data.get("industry"))
+
+    print("Full Data :", data)
+
+    print("==========================================\n")
+
     serializer = ClientSerializer(
-
         data=data,
-
-        context={
-            'signatures': signatures
-        }
+        context={'signatures': signatures}
     )
 
     if serializer.is_valid():
 
-        # =====================================
-        # SAVE CLIENT
-        # =====================================
-
         client = serializer.save()
 
-        email = client.email
-
-        # =====================================
-        # CREATE USER
-        # =====================================
-
-        if email and not User.objects.filter(
-            email=email
-        ).exists():
-
-            User.objects.create(
-
-                username=email,
-
-                email=email,
-
-                role='client',
-
-                client=client
-            )
-
-        # =====================================
-        # REALTIME NOTIFICATION
-        # =====================================
+        print("\n CLIENT SAVED SUCCESSFULLY")
+        print("Client ID :", client.client_id)
+        print("Client Name :", client.name)
+        print("====================================\n")
 
         channel_layer = get_channel_layer()
 
-        async_to_sync(
-            channel_layer.group_send
-        )(
+        async_to_sync(channel_layer.group_send)(
             "notifications",
             {
                 "type": "send_notification",
-
-                "message":
-                f"New client onboard submitted: {client.name}"
+                "message": f"New client onboard submitted: {client.name}"
             }
         )
 
-        # =====================================
-        # SUCCESS RESPONSE
-        # =====================================
-
         return Response({
-
-            "message":
-            "Client created successfully"
-
+            "message": "Client created successfully"
         }, status=201)
 
-    return Response(
-        serializer.errors,
-        status=400
-    )
+    print("\n SERIALIZER ERRORS")
+    print(serializer.errors)
+    print("====================================\n")
+
+    return Response(serializer.errors, status=400)
+
+
+# @api_view(['POST'])
+# def create_client(request):
+
+#     try:
+
+#         signatures = {
+
+#             key: request.FILES[key]
+
+#             for key in request.FILES
+
+#             if key.startswith(
+#                 'contact_signature_'
+#             )
+#         }
+
+#         raw = request.data.get('data')
+
+#         if raw:
+
+#             parsed = json.loads(raw)
+
+#             data = parsed
+
+#         else:
+
+#             data = request.data
+
+#         serializer = ClientSerializer(
+
+#             data=data,
+
+#             context={
+#                 'signatures': signatures
+#             }
+#         )
+
+#         if serializer.is_valid():
+
+#             # ==========================
+#             # SAVE CLIENT
+#             # ==========================
+
+#             client = serializer.save()
+
+#             # ==========================
+#             # CREATE LOGIN USER
+#             # ==========================
+
+#             email = client.email
+
+#             if email and not User.objects.filter(
+#                 email=email
+#             ).exists():
+
+#                 User.objects.create(
+
+#                     username=email,
+
+#                     email=email,
+
+#                     role='client',
+
+#                     client=client
+#                 )
+
+#             # ==========================
+#             # SEND REALTIME NOTIFICATION
+#             # ==========================
+
+#             channel_layer = get_channel_layer()
+
+#             async_to_sync(
+#                 channel_layer.group_send
+#             )(
+#                 "notifications",
+#                 {
+#                     "type": "send_notification",
+
+#                     "message":
+#                     f"New Client Submitted: {client.name}"
+#                 }
+#             )
+
+#             # ==========================
+#             # RESPONSE
+#             # ==========================
+
+#             return Response({
+
+#                 "message":
+#                 "Client created successfully"
+
+#             }, status=201)
+
+#         return Response(
+#             serializer.errors,
+#             status=400
+#         )
+
+#     except Exception as e:
+
+#         return Response({
+
+#             "error": str(e)
+
+#         }, status=500)
 
 
 
@@ -346,6 +459,7 @@ def create_campaign(request):
                         'kpi_notes': li.get('kpi_notes', ''),
                         'unit_value': li.get('unit_value') or None,
 
+
                     }
                 )
 
@@ -464,13 +578,256 @@ def get_campaign_by_id(request, campaign_id):  # http://127.0.0.1:8000/get_campa
 # UPDATE CAMPAIGN
 # =========================================================
 
+# @api_view(['GET', 'PUT'])
+# @parser_classes([MultiPartParser, FormParser])
+
+# def update_campaign(request, campaign_id):
+
+#     # =====================================================
+#     # FIND EXISTING CAMPAIGN
+#     # =====================================================
+
+#     try:
+
+#         campaign = Campaign.objects.select_related(
+#             'client'
+#         ).prefetch_related(
+#             'line_items__creatives_detail',
+#             'line_items__third_party_creatives'
+#         ).get(
+#             campaign_id=campaign_id
+#         )
+
+#     except Campaign.DoesNotExist:
+
+#         return Response(
+#             {"error": "Campaign not found"},
+#             status=404
+#         )
+
+#     # =====================================================
+#     # GET EXISTING DATA
+#     # =====================================================
+
+#     if request.method == 'GET':
+
+#         serializer = CampaignSerializer(
+#             campaign,
+#             context={'request': request}
+#         )
+
+#         return Response(serializer.data)
+
+#     # =====================================================
+#     # UPDATE DATA
+#     # =====================================================
+
+#     try:
+
+#         with transaction.atomic():
+
+#             # =============================================
+#             # UPDATE CAMPAIGN DETAILS
+#             # =============================================
+
+#             serializer = CampaignSerializer(
+#                 campaign,
+#                 data=request.data,
+#                 partial=True
+#             )
+
+#             if not serializer.is_valid():
+
+#                 return Response(
+#                     serializer.errors,
+#                     status=400
+#                 )
+
+#             serializer.save()
+
+#             # =============================================
+#             # GET LINE ITEMS
+#             # =============================================
+
+#             try:
+
+#                 line_items_data = json.loads(
+#                     request.data.get(
+#                         'line_items',
+#                         '[]'
+#                     )
+#                 )
+
+#             except Exception:
+
+#                 return Response(
+#                     {"error": "Invalid line_items JSON"},
+#                     status=400
+#                 )
+
+#             # =============================================
+#             # LOOP LINE ITEMS
+#             # =============================================
+
+#             for i, li in enumerate(line_items_data):
+
+#                 line_item_id = li.get(
+#                     'line_item_id'
+#                 )
+
+#                 if not line_item_id:
+#                     continue
+
+#                 # =========================================
+#                 # UPDATE / CREATE LINE ITEM
+#                 # =========================================
+
+#                 line_item, _ = LineItem.objects.update_or_create(
+
+#                     line_item_id=line_item_id,
+
+#                     defaults={
+
+#                         'campaign': campaign,
+#                         'line_item_name': li.get('lineItemName'),
+#                         'ethnicity': li.get('ethnicity',[]),
+#                         'start_date': parse_date(li.get('startDate')),
+#                         'end_date': parse_date(li.get('endDate')),
+#                         'ad_format': li.get('adFormat',[]),
+#                         'impressions': li.get('impressions') or None,
+#                         'units': li.get('units') or None,
+#                         'ctr': li.get('ctr') or None,
+#                         'viewability': li.get('viewability') or None,
+#                         'vcr': li.get('vcr') or None,
+#                         'unit_cost': li.get('unit_cost') or None,
+#                         'kpi_notes': li.get('kpi_notes', ''),
+#                         'unit_value': li.get('unit_value') or None,
+                       
+
+#                     }
+#                 )
+
+#                 # =========================================
+#                 # NORMAL CREATIVES
+#                 # =========================================
+
+#                 creatives_meta = li.get(
+#                     'creatives',
+#                     []
+#                 )
+
+#                 for j, meta in enumerate(creatives_meta):
+
+#                     if not meta.get(
+#                         'creative_name'
+#                     ):
+#                         continue
+
+#                     main_asset = request.FILES.get(
+#                         f'line_item_{i}main_asset{j}'
+#                     )
+
+#                     Creative.objects.create(
+
+#                         line_item=line_item,
+
+#                         creative_name=meta.get(
+#                             'creative_name',
+#                             ''
+#                         ),
+
+#                         main_asset=main_asset,
+
+#                         dimensions=meta.get(
+#                             'dimensions',
+#                             ''
+#                         ),
+
+#                         aspect_ratio=meta.get(
+#                             'aspect_ratio',
+#                             ''
+#                         ),
+
+#                         file_size=meta.get(
+#                             'file_size',
+#                             ''
+#                         ),
+
+#                         click_through_url=meta.get(
+#                             'click_through_url'
+#                         ) or None,
+
+#                         appended_html_tag=meta.get(
+#                             'appended_html_tag',
+#                             ''
+#                         ),
+
+#                         integration_code=meta.get(
+#                             'integration_code',
+#                             ''
+#                         ),
+
+#                         notes=meta.get(
+#                             'notes',
+#                             ''
+#                         ),
+#                     )
+
+#                 # =========================================
+#                 # THIRD PARTY CREATIVES
+#                 # =========================================
+
+#                 third_party_meta = li.get(
+#                     'third_party_creatives',
+#                     []
+#                 )
+
+#                 for k, _ in enumerate(third_party_meta):
+
+#                     input_file = request.FILES.get(
+#                         f'line_item_{i}thirdparty_file{k}'
+#                     )
+
+#                     backup_image = request.FILES.get(
+#                         f'line_item_{i}thirdparty_backup{k}'
+#                     )
+
+#                     ThirdPartyCreative.objects.create(
+
+#                         line_item=line_item,
+
+#                         input_file=input_file,
+
+#                         backup_image=backup_image,
+#                     )
+
+#     except Exception as e:
+
+#         return Response(
+#             {"error": str(e)},
+#             status=500
+#         )
+
+#     # =====================================================
+#     # SUCCESS RESPONSE
+#     # =====================================================
+
+#     return Response({
+
+#         "message": "Campaign updated successfully",
+
+#         "campaign_id": campaign.campaign_id,
+
+#     }, status=200) 
+
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 @api_view(['GET', 'PUT'])
-@parser_classes([MultiPartParser, FormParser])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 
 def update_campaign(request, campaign_id):
 
     # =====================================================
-    # FIND EXISTING CAMPAIGN
+    # FIND CAMPAIGN
     # =====================================================
 
     try:
@@ -492,7 +849,7 @@ def update_campaign(request, campaign_id):
         )
 
     # =====================================================
-    # GET EXISTING DATA
+    # GET CAMPAIGN
     # =====================================================
 
     if request.method == 'GET':
@@ -505,22 +862,30 @@ def update_campaign(request, campaign_id):
         return Response(serializer.data)
 
     # =====================================================
-    # UPDATE DATA
+    # UPDATE CAMPAIGN
     # =====================================================
 
     try:
 
         with transaction.atomic():
 
-            # =============================================
-            # UPDATE CAMPAIGN DETAILS
-            # =============================================
+            data = {}
+            for key, value in request.data.items():
+                if key != 'line_items':   # ← exclude line_items from campaign serializer
+                    data[key] = value
 
             serializer = CampaignSerializer(
+
                 campaign,
+
                 data=request.data,
-                partial=True
+
+                partial=True,
+
+                context={'request': request}
             )
+
+
 
             if not serializer.is_valid():
 
@@ -529,7 +894,24 @@ def update_campaign(request, campaign_id):
                     status=400
                 )
 
-            serializer.save()
+            # =============================================
+            # SAVE CAMPAIGN
+            # =============================================
+
+            serializer.save(
+
+                new_cpm=(
+                    request.data.get('new_cpm')
+                    if request.data.get('new_cpm')
+                    else None
+                ),
+
+                new_price=(
+                    request.data.get('new_price')
+                    if request.data.get('new_price')
+                    else None
+                )
+            )
 
             # =============================================
             # GET LINE ITEMS
@@ -543,6 +925,7 @@ def update_campaign(request, campaign_id):
                         '[]'
                     )
                 )
+                
 
             except Exception:
 
@@ -564,10 +947,6 @@ def update_campaign(request, campaign_id):
                 if not line_item_id:
                     continue
 
-                # =========================================
-                # UPDATE / CREATE LINE ITEM
-                # =========================================
-
                 line_item, _ = LineItem.objects.update_or_create(
 
                     line_item_id=line_item_id,
@@ -575,26 +954,51 @@ def update_campaign(request, campaign_id):
                     defaults={
 
                         'campaign': campaign,
-                        'line_item_name': li.get('lineItemName'),
-                        'ethnicity': li.get('ethnicity',[]),
-                        'start_date': parse_date(li.get('startDate')),
-                        'end_date': parse_date(li.get('endDate')),
-                        'ad_format': li.get('adFormat',[]),
-                        'impressions': li.get('impressions') or None,
-                        'units': li.get('units') or None,
-                        'ctr': li.get('ctr') or None,
-                        'viewability': li.get('viewability') or None,
-                        'vcr': li.get('vcr') or None,
-                        'unit_cost': li.get('unit_cost') or None,
-                        'kpi_notes': li.get('kpi_notes', ''),
-                        'unit_value': li.get('unit_value') or None,
 
+                        'line_item_name':
+                        li.get('lineItemName'),
+
+                        'ethnicity':
+                        li.get('ethnicity', []),
+
+                        'start_date':
+                        parse_date(li.get('startDate')),
+
+                        'end_date':
+                        parse_date(li.get('endDate')),
+
+                        'ad_format':
+                        li.get('adFormat', []),
+
+                        'impressions':
+                        li.get('impressions') or None,
+
+                        'units':
+                        li.get('units') or None,
+
+                        'ctr':
+                        li.get('ctr') or None,
+
+                        'viewability':
+                        li.get('viewability') or None,
+
+                        'vcr':
+                        li.get('vcr') or None,
+
+                        'unit_cost':
+                        li.get('unit_cost') or None,
+
+                        'kpi_notes':
+                        li.get('kpi_notes', ''),
+
+                        'unit_value':
+                        li.get('unit_value') or None,
                     }
                 )
 
-                # =========================================
+                # =============================================
                 # NORMAL CREATIVES
-                # =========================================
+                # =============================================
 
                 creatives_meta = li.get(
                     'creatives',
@@ -658,9 +1062,9 @@ def update_campaign(request, campaign_id):
                         ),
                     )
 
-                # =========================================
+                # =============================================
                 # THIRD PARTY CREATIVES
-                # =========================================
+                # =============================================
 
                 third_party_meta = li.get(
                     'third_party_creatives',
@@ -688,6 +1092,10 @@ def update_campaign(request, campaign_id):
 
     except Exception as e:
 
+        import traceback
+
+        print(traceback.format_exc())
+
         return Response(
             {"error": str(e)},
             status=500
@@ -699,13 +1107,13 @@ def update_campaign(request, campaign_id):
 
     return Response({
 
-        "message": "Campaign updated successfully",
+        "message":
+        "Campaign updated successfully",
 
-        "campaign_id": campaign.campaign_id,
+        "campaign_id":
+        campaign.campaign_id,
 
-    }, status=200) 
-
-
+    }, status=200)
 
 
 # =========================================================
@@ -721,11 +1129,15 @@ def delete_campaign(request, campaign_id):
 
     try:
 
-        campaign = Campaign.objects.get(
-            campaign_id=campaign_id
-        )
+        # ✅ Try campaign_id string first, fallback to pk
+        try:
+            campaign = Campaign.objects.get(campaign_id=campaign_id)
+        except Campaign.DoesNotExist:
+            # For pending campaigns where campaign_id is null, try pk
+            campaign = Campaign.objects.get(pk=campaign_id)
 
     except Campaign.DoesNotExist:
+        
 
         return Response({
 
@@ -751,53 +1163,10 @@ def delete_campaign(request, campaign_id):
 
     }, status=200)
 
+
+
+
 # ------------- Login functionality ---------------
-
-# @api_view(['POST'])
-# def login_view(request):
-
-#     email = request.data.get('email') # get the email and password from frontend request body
-#     password = request.data.get('password')
-#     if not email or not password:
-#         return Response({"error":"Email and password are required"}, status=400)
-
-#     # FIND USER
-#     try:
-#         user_obj = User.objects.get(email=email) # searches the user in db using email
-#     except User.DoesNotExist:
-#         return Response({"error":"Invalid email"}, status=401)
-
-#     # AUTHENTICATE
-#     user = authenticate(  # verifies the password & username using django built-in authentication system.
-#         username=user_obj.username,
-#         password=password
-#     )
-
-#     if user is None:
-#         return Response({"error":"Invalid password"}, status=401)
-    
-#     # UPDATE LAST LOGIN TIME
-#     user.last_login = timezone.now()
-#     user.save()
-
-#     # CHECK CLIENT APPROVAL
-#     if user.role == 'client':   # check if the logged user is client
-#         if user.client.status != 'approved':  # check the client approvel status
-#             return Response({"error":"Your account is not approved yet"}, status=403)
-
-#     return Response({
-
-#         "message": "Login successful",
-#         "user": {
-#             "id": user.id,
-#             "username": user.username,
-#             "email": user.email,
-#             "role": user.role,
-#             "client_id": (user.client.client_id if user.client else None)# If user linked with client: return client id otherwise return None # If user linked with client: return client id otherwise return None 
-#         }
-#     }, status=200)
-
-
 
 @api_view(['POST'])
 def login_view(request):
@@ -861,6 +1230,7 @@ def login_view(request):
             "source":    "user",
         }
     }, status=200)
+
 
 # ------------------ Download function ----------------------
 
@@ -1243,3 +1613,34 @@ def edit_client_user(request, id):
 
     user.save()
     return Response({"message": "Updated successfully"}, status=200)
+
+
+# ---------------------------
+# Approve campaign function
+# ---------------------------
+
+@api_view(['POST'])
+def approve_campaign(request, pk):
+    try:
+        # Find by DB primary key or campaign_id (if already set)
+        campaign = Campaign.objects.get(pk=pk)
+    except Campaign.DoesNotExist:
+        return Response({"error": "Campaign not found"}, status=404)
+
+    if campaign.campaign_id:
+        return Response({"error": "Campaign already approved"}, status=400)
+
+    # Generate ID now
+    for i in range(5):
+        with transaction.atomic():
+            new_id = campaign.generate_campaign_id()
+            if not Campaign.objects.filter(campaign_id=new_id).exists():
+                campaign.campaign_id = new_id
+                campaign.approval_status = 'approved'
+                campaign.save()
+                break
+
+    return Response({
+        "message": "Campaign approved",
+        "campaign_id": campaign.campaign_id,
+    }, status=200)

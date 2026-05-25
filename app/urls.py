@@ -29,6 +29,8 @@ urlpatterns = [
     path('delete_client_user/<int:id>/', views.delete_client_user, name='delete_client_user'),
     path('edit_client_user/<int:id>/', views.edit_client_user, name='edit_client_user'),
     path('delete_campaign/<str:campaign_id>/', views.delete_campaign, name='delete_campaign'),
+    path('approve_campaign/<int:pk>/', views.approve_campaign, name='approve_campaign'),
+
     
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

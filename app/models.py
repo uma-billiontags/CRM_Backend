@@ -47,7 +47,7 @@ class Client(models.Model):
 
     # Basic Info
     name = models.CharField(max_length=200) # enter company name
-    reporting_id = models.CharField(max_length=100)
+    #reporting_id = models.CharField(max_length=100)
 
     company_type = models.CharField(max_length=100)
     agency_type = models.CharField(max_length=100, blank=True)
@@ -283,8 +283,15 @@ class Campaign(models.Model):
     end_date = models.DateField()
 
     # Auto-generated field
-    campaign_id = models.CharField(max_length=100,unique=True,editable=False) # auto generate campaign ID 
+    campaign_id = models.CharField(max_length=100, unique=True, editable=False, null=True, blank=True)
 
+    # Add approval status
+    approval_status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('approved', 'Approved')],
+        default='pending'
+    )
+        
     notes = models.TextField(blank=True, null=True)
 
     age = models.CharField(max_length=50)
@@ -296,6 +303,8 @@ class Campaign(models.Model):
     frequency_cap = models.PositiveIntegerField(blank=True, null=True)
     brand_safety = models.CharField(max_length=20)
     viewability_goal = models.PositiveIntegerField(blank=True, null=True)
+    new_cpm = models.FloatField(null=True, blank=True)
+    new_price = models.FloatField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -320,18 +329,12 @@ class Campaign(models.Model):
     # FIXED save method (INSIDE CLASS)
 
     def save(self, *args, **kwargs):
-        if not self.campaign_id:
-           # to prevent duplicate IDs when multiple requests hit your server at the same time.
-            for i in range(5): 
-                with transaction.atomic():
-                    new_id = self.generate_campaign_id()
-                    if not Campaign.objects.filter(campaign_id=new_id).exists():
-                        self.campaign_id = new_id
-                        break
         super().save(*args, **kwargs)
 
-    def __str__(self):
+    def __str__(self): 
         return f"{self.campaign_name} ({self.client.name})"
+
+
 
 
 # ==== Add Line Item ====

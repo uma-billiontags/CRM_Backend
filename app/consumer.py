@@ -1,47 +1,44 @@
 from channels.generic.websocket import AsyncWebsocketConsumer
-
 import json
 
 
-class NotificationConsumer(     # handles websocket connect, disconnet and message events.
-    AsyncWebsocketConsumer
-):
+class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
 
         self.group_name = "notifications"
 
+        # Join notification group
         await self.channel_layer.group_add(
-
             self.group_name,
-
             self.channel_name
         )
 
-        await self.accept()  # Connection accepted successfully
+        # Accept websocket connection
+        await self.accept()
 
-    async def disconnect(
-        self,
-        close_code
-    ):
+        print("WebSocket Connected")
 
+
+    async def disconnect(self, close_code):
+
+        # Leave notification group
         await self.channel_layer.group_discard(
-
             self.group_name,
-
             self.channel_name
         )
 
-    async def send_notification(
-        self,
-        event
-    ):
+        print("WebSocket Disconnected")
 
+
+    # Receive message from group
+    async def send_notification(self, event):
+
+        message = event["message"]
+
+        # Send message to frontend
         await self.send(text_data=json.dumps({
-
-            "message":
-            event["message"]
-
+            "message": message
         }))
 
-
+        
