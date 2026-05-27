@@ -17,6 +17,7 @@ from django.contrib.auth import authenticate
 from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from .notification import send_push_notification
 
 
 
@@ -129,6 +130,9 @@ def home(request):
 #     )
 
 
+
+
+
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
@@ -136,82 +140,19 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 
 from .serializers import ClientSerializer
-from .models import User
+from .models import Client, User
 
 import json
-
-@api_view(['POST'])
-def create_client(request):
-
-    signatures = {
-        key: request.FILES[key]
-        for key in request.FILES
-        if key.startswith('contact_signature_')
-    }
-
-    raw = request.data.get('data')
-
-    if raw:
-        parsed = json.loads(raw)
-        data = parsed
-    else:
-        data = request.data
-
-    # =========================
-    # PRINT REQUEST DATA
-    # =========================
-
-    print("\n========== NEW CLIENT SUBMITTED ==========")
-
-    print("Client Name :", data.get("name"))
-    print("Email       :", data.get("email"))
-    print("Phone       :", data.get("phone"))
-    print("Company     :", data.get("company_type"))
-    print("Industry    :", data.get("industry"))
-
-    print("Full Data :", data)
-
-    print("==========================================\n")
-
-    serializer = ClientSerializer(
-        data=data,
-        context={'signatures': signatures}
-    )
-
-    if serializer.is_valid():
-
-        client = serializer.save()
-
-        print("\n CLIENT SAVED SUCCESSFULLY")
-        print("Client ID :", client.client_id)
-        print("Client Name :", client.name)
-        print("====================================\n")
-
-        channel_layer = get_channel_layer()
-
-        async_to_sync(channel_layer.group_send)(
-            "notifications",
-            {
-                "type": "send_notification",
-                "message": f"New client onboard submitted: {client.name}"
-            }
-        )
-
-        return Response({
-            "message": "Client created successfully"
-        }, status=201)
-
-    print("\n SERIALIZER ERRORS")
-    print(serializer.errors)
-    print("====================================\n")
-
-    return Response(serializer.errors, status=400)
 
 
 # @api_view(['POST'])
 # def create_client(request):
 
 #     try:
+
+#         # ==========================
+#         # GET SIGNATURE FILES
+#         # ==========================
 
 #         signatures = {
 
@@ -224,6 +165,10 @@ def create_client(request):
 #             )
 #         }
 
+#         # ==========================
+#         # GET FORM DATA
+#         # ==========================
+
 #         raw = request.data.get('data')
 
 #         if raw:
@@ -235,6 +180,27 @@ def create_client(request):
 #         else:
 
 #             data = request.data
+
+#         # ==========================
+#         # CHECK DUPLICATE EMAIL
+#         # ==========================
+
+#         email = data.get("email")
+
+#         if Client.objects.filter(
+#             email=email
+#         ).exists():
+
+#             return Response({
+
+#                 "error":
+#                 "This email is already registered"
+
+#             }, status=400)
+
+#         # ==========================
+#         # SERIALIZER VALIDATION
+#         # ==========================
 
 #         serializer = ClientSerializer(
 
@@ -253,11 +219,17 @@ def create_client(request):
 
 #             client = serializer.save()
 
+#             send_push_notification(
+
+#             "New Client Request",
+
+#             f"New Client Submitted: {client.name}"
+
+#         )
+
 #             # ==========================
 #             # CREATE LOGIN USER
 #             # ==========================
-
-#             email = client.email
 
 #             if email and not User.objects.filter(
 #                 email=email
@@ -293,7 +265,7 @@ def create_client(request):
 #             )
 
 #             # ==========================
-#             # RESPONSE
+#             # SUCCESS RESPONSE
 #             # ==========================
 
 #             return Response({
@@ -303,6 +275,10 @@ def create_client(request):
 
 #             }, status=201)
 
+#         # ==========================
+#         # SERIALIZER ERROR RESPONSE
+#         # ==========================
+
 #         return Response(
 #             serializer.errors,
 #             status=400
@@ -310,11 +286,190 @@ def create_client(request):
 
 #     except Exception as e:
 
+#         # ==========================
+#         # EXCEPTION ERROR RESPONSE
+#         # ==========================
+
 #         return Response({
 
 #             "error": str(e)
 
 #         }, status=500)
+
+
+
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+
+from .serializers import ClientSerializer
+from .models import Client, User
+
+from .notification import send_push_notification
+
+import json
+
+
+@api_view(['POST'])
+def create_client(request):
+
+    try:
+
+        # ==========================
+        # GET SIGNATURE FILES
+        # ==========================
+
+        signatures = {
+
+            key: request.FILES[key]
+
+            for key in request.FILES
+
+            if key.startswith(
+                'contact_signature_'
+            )
+        }
+
+        # ==========================
+        # GET FORM DATA
+        # ==========================
+
+        raw = request.data.get('data')
+
+        if raw:
+
+            parsed = json.loads(raw)
+
+            data = parsed
+
+        else:
+
+            data = request.data
+
+        # ==========================
+        # CHECK DUPLICATE EMAIL
+        # ==========================
+
+        email = data.get("email")
+
+        if Client.objects.filter(
+            email=email
+        ).exists():
+
+            return Response({
+
+                "error":
+                "This email is already registered"
+
+            }, status=400)
+
+        # ==========================
+        # SERIALIZER VALIDATION
+        # ==========================
+
+        serializer = ClientSerializer(
+
+            data=data,
+
+            context={
+                'signatures': signatures
+            }
+        )
+
+        if serializer.is_valid():
+
+            # ==========================
+            # SAVE CLIENT
+            # ==========================
+
+            client = serializer.save()
+
+            # ==========================
+            # CREATE LOGIN USER
+            # ==========================
+
+            if email and not User.objects.filter(
+                email=email
+            ).exists():
+
+                User.objects.create(
+
+                    username=email,
+
+                    email=email,
+
+                    role='client',
+
+                    client=client
+                )
+
+            # ==========================
+            # SEND FIREBASE PUSH NOTIFICATION
+            # ==========================
+
+            send_push_notification(
+
+                "New Client Request",
+
+                f"New Client Submitted: {client.name}"
+
+            )
+
+            # ==========================
+            # SEND WEBSOCKET REALTIME NOTIFICATION
+            # ==========================
+
+            channel_layer = get_channel_layer()
+
+            async_to_sync(
+                channel_layer.group_send
+            )(
+                "notifications",
+                {
+                    "type": "send_notification",
+
+                    "message":
+                    f"New Client Submitted: {client.name}"
+                }
+            )
+
+            # ==========================
+            # SUCCESS RESPONSE
+            # ==========================
+
+            return Response({
+
+                "message":
+                "Client created successfully"
+
+            }, status=201)
+
+        # ==========================
+        # SERIALIZER ERROR RESPONSE
+        # ==========================
+
+        return Response(
+
+            serializer.errors,
+
+            status=400
+        )
+
+    except Exception as e:
+
+        # ==========================
+        # EXCEPTION ERROR RESPONSE
+        # ==========================
+
+        return Response({
+
+            "error":
+            str(e)
+
+        }, status=500)
 
 
 
@@ -333,7 +488,6 @@ def update_client_status(request, client_id):
     client.status = status
     client.save()
     return Response({"message": f"Client status updated to {status}"}, status=200)
-
 
 
 
@@ -1644,3 +1798,39 @@ def approve_campaign(request, pk):
         "message": "Campaign approved",
         "campaign_id": campaign.campaign_id,
     }, status=200)
+
+
+
+# ==========================================
+# FCM Token Update Function
+# ==========================================
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+from .models import FCMToken
+
+
+@api_view(['POST'])
+@csrf_exempt
+def save_fcm_token(request):
+
+    try:
+
+        data = json.loads(request.body)
+
+        token = data.get("token")
+
+        if token:
+
+            FCMToken.objects.get_or_create(token=token)
+
+            return Response({"message":"Token Saved Successfully"}, status=200)
+
+        return Response({"error":"Token Missing"}, status=400)
+
+    except Exception as e:
+
+        return Response({"error":str(e)}, status=500)

@@ -472,3 +472,15 @@ class TeamAccess(models.Model):
         return self.member
 
 
+# ==============================
+# FCM TOKEN MODEL
+# ==============================
+
+class FCMToken(models.Model):
+
+    token = models.CharField(max_length=500, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+
+        return self.token

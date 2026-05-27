@@ -30,6 +30,7 @@ urlpatterns = [
     path('edit_client_user/<int:id>/', views.edit_client_user, name='edit_client_user'),
     path('delete_campaign/<str:campaign_id>/', views.delete_campaign, name='delete_campaign'),
     path('approve_campaign/<int:pk>/', views.approve_campaign, name='approve_campaign'),
+    path('save_fcm_token/', views.save_fcm_token, name='save_fcm_token'),
 
     
 

@@ -1,6 +1,8 @@
 from django.urls import re_path
 from .consumer import NotificationConsumer
 
+# Websocket Url mapping 
+
 websocket_urlpatterns = [
 
     re_path(

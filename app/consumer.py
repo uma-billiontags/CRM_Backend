@@ -1,6 +1,10 @@
-from channels.generic.websocket import AsyncWebsocketConsumer
+# channels.generic.websocket → Django Channels module for WebSocket handling.
+# AsyncWebsocketConsumer → a built-in class that helps create asynchronous WebSocket consumers.
+
+from channels.generic.websocket import AsyncWebsocketConsumer 
 import json
 
+# It handle websocket connection, disconnection and message sending to frontend when notification is triggered from backend.
 
 class NotificationConsumer(AsyncWebsocketConsumer):
 
