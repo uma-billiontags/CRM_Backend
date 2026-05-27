@@ -11,3 +11,5 @@ venv/
 # Database (optional)
 db.sqlite3
 
+# Firebase service account key (optional, but should be kept secret)
+firebase-adminsdk*.json
