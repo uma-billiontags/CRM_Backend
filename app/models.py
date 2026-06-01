@@ -478,9 +478,84 @@ class TeamAccess(models.Model):
 
 class FCMToken(models.Model):
 
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True
+    )
+
     token = models.CharField(max_length=500, unique=True)
+    #token = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
 
         return self.token
+
+
+
+
+# # ==============================
+# # CHAT ROOM MODEL
+# # ==============================
+
+# class ChatRoom(models.Model):
+
+#     campaign = models.OneToOneField(
+#         Campaign,
+#         on_delete=models.CASCADE,
+#         related_name='chat_room'
+#     )
+
+#     client = models.ForeignKey(
+#         Client,
+#         on_delete=models.CASCADE,
+#         related_name='chat_rooms'
+#     )
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return f"Room → {self.campaign.campaign_id} ({self.client.name})"
+
+
+# # ==============================
+# # MESSAGE MODEL
+# # ==============================
+
+# class Message(models.Model):
+
+#     SENDER_TYPE = [
+#         ('client', 'Client'),
+#         ('admin',  'Admin'),
+#     ]
+
+#     room = models.ForeignKey(
+#         ChatRoom,
+#         on_delete=models.CASCADE,
+#         related_name='messages'
+#     )
+
+#     sender = models.ForeignKey(
+#         User,
+#         on_delete=models.CASCADE,
+#         related_name='messages'
+#     )
+
+#     sender_type = models.CharField(
+#         max_length=10,
+#         choices=SENDER_TYPE
+#     )
+
+#     content = models.TextField()
+
+#     timestamp = models.DateTimeField(auto_now_add=True)
+
+#     is_read = models.BooleanField(default=False)
+
+#     class Meta:
+#         ordering = ['timestamp']  # oldest first → WhatsApp style
+
+#     def __str__(self):
+#         return f"{self.sender_type} → {self.room} → {self.timestamp:%Y-%m-%d %H:%M}"

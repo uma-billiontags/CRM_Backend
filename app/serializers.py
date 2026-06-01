@@ -255,3 +255,30 @@ class TeamAccessSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamAccess
         fields = '__all__'
+
+
+# Claude
+
+# ==============================
+# MESSAGE SERIALIZER
+# ==============================
+
+
+# class MessageSerializer(serializers.ModelSerializer):
+
+#     sender_name = serializers.CharField(
+#         source='sender.username',
+#         read_only=True
+#     )
+
+#     class Meta:
+#         model = Message
+#         fields = [
+#             'id',
+#             'content',
+#             'sender_id',
+#             'sender_name',
+#             'sender_type',
+#             'timestamp',
+#             'is_read',
+#         ]

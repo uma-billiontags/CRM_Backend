@@ -13,3 +13,7 @@ db.sqlite3
 
 # Firebase service account key (optional, but should be kept secret)
 firebase-adminsdk*.json
+
+# Firebase
+*.json
+crm-notification-system-b1fbf-firebase-adminsdk-fbsvc-e2c98885a3.json

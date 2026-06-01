@@ -18,10 +18,11 @@ import os
 
 import firebase_admin
 
-from firebase_admin import credentials
+from firebase_admin import credentials 
 
 from django.conf import settings
 
+# Fire base json file path
 firebase_cred_path = os.path.join(
 
     settings.BASE_DIR,

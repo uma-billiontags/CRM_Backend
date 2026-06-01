@@ -31,279 +31,8 @@ def home(request):
 # DEFINE CLIENT FUNCTION
 # ==============================
 
-# @api_view(['POST'])
-# def create_client(request):
-
-#     signatures = {
-
-#         key: request.FILES[key]
-
-#         for key in request.FILES
-
-#         if key.startswith(
-#             'contact_signature_'
-#         )
-#     }
-
-#     raw = request.data.get('data')
-
-#     if raw:
-
-#         parsed = json.loads(raw)
-
-#         data = parsed
-
-#     else:
-
-#         data = request.data
-
-#     serializer = ClientSerializer(
-
-#         data=data,
-
-#         context={
-#             'signatures': signatures
-#         }
-#     )
-
-#     if serializer.is_valid():
-
-#         # =====================================
-#         # SAVE CLIENT
-#         # =====================================
-
-#         client = serializer.save()
-
-#         email = client.email
-
-#         # =====================================
-#         # CREATE USER
-#         # =====================================
-
-#         if email and not User.objects.filter(
-#             email=email
-#         ).exists():
-
-#             User.objects.create(
-
-#                 username=email,
-
-#                 email=email,
-
-#                 role='client',
-
-#                 client=client
-#             )
-
-#         # =====================================
-#         # REALTIME NOTIFICATION
-#         # =====================================
-
-#         channel_layer = get_channel_layer()
-
-#         async_to_sync(
-#             channel_layer.group_send
-#         )(
-#             "notifications",
-#             {
-#                 "type": "send_notification",
-
-#                 "message":
-#                 f"New client onboard submitted: {client.name}"
-#             }
-#         )
-
-#         # =====================================
-#         # SUCCESS RESPONSE
-#         # =====================================
-
-#         return Response({
-
-#             "message":
-#             "Client created successfully"
-
-#         }, status=201)
-
-#     return Response(
-#         serializer.errors,
-#         status=400
-#     )
-
-
-
-
-
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
-
-from .serializers import ClientSerializer
-from .models import Client, User
-
-import json
-
-
-# @api_view(['POST'])
-# def create_client(request):
-
-#     try:
-
-#         # ==========================
-#         # GET SIGNATURE FILES
-#         # ==========================
-
-#         signatures = {
-
-#             key: request.FILES[key]
-
-#             for key in request.FILES
-
-#             if key.startswith(
-#                 'contact_signature_'
-#             )
-#         }
-
-#         # ==========================
-#         # GET FORM DATA
-#         # ==========================
-
-#         raw = request.data.get('data')
-
-#         if raw:
-
-#             parsed = json.loads(raw)
-
-#             data = parsed
-
-#         else:
-
-#             data = request.data
-
-#         # ==========================
-#         # CHECK DUPLICATE EMAIL
-#         # ==========================
-
-#         email = data.get("email")
-
-#         if Client.objects.filter(
-#             email=email
-#         ).exists():
-
-#             return Response({
-
-#                 "error":
-#                 "This email is already registered"
-
-#             }, status=400)
-
-#         # ==========================
-#         # SERIALIZER VALIDATION
-#         # ==========================
-
-#         serializer = ClientSerializer(
-
-#             data=data,
-
-#             context={
-#                 'signatures': signatures
-#             }
-#         )
-
-#         if serializer.is_valid():
-
-#             # ==========================
-#             # SAVE CLIENT
-#             # ==========================
-
-#             client = serializer.save()
-
-#             send_push_notification(
-
-#             "New Client Request",
-
-#             f"New Client Submitted: {client.name}"
-
-#         )
-
-#             # ==========================
-#             # CREATE LOGIN USER
-#             # ==========================
-
-#             if email and not User.objects.filter(
-#                 email=email
-#             ).exists():
-
-#                 User.objects.create(
-
-#                     username=email,
-
-#                     email=email,
-
-#                     role='client',
-
-#                     client=client
-#                 )
-
-#             # ==========================
-#             # SEND REALTIME NOTIFICATION
-#             # ==========================
-
-#             channel_layer = get_channel_layer()
-
-#             async_to_sync(
-#                 channel_layer.group_send
-#             )(
-#                 "notifications",
-#                 {
-#                     "type": "send_notification",
-
-#                     "message":
-#                     f"New Client Submitted: {client.name}"
-#                 }
-#             )
-
-#             # ==========================
-#             # SUCCESS RESPONSE
-#             # ==========================
-
-#             return Response({
-
-#                 "message":
-#                 "Client created successfully"
-
-#             }, status=201)
-
-#         # ==========================
-#         # SERIALIZER ERROR RESPONSE
-#         # ==========================
-
-#         return Response(
-#             serializer.errors,
-#             status=400
-#         )
-
-#     except Exception as e:
-
-#         # ==========================
-#         # EXCEPTION ERROR RESPONSE
-#         # ==========================
-
-#         return Response({
-
-#             "error": str(e)
-
-#         }, status=500)
-
-
-
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-
-from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 
 from .serializers import ClientSerializer
 from .models import Client, User
@@ -419,24 +148,6 @@ def create_client(request):
             )
 
             # ==========================
-            # SEND WEBSOCKET REALTIME NOTIFICATION
-            # ==========================
-
-            channel_layer = get_channel_layer()
-
-            async_to_sync(
-                channel_layer.group_send
-            )(
-                "notifications",
-                {
-                    "type": "send_notification",
-
-                    "message":
-                    f"New Client Submitted: {client.name}"
-                }
-            )
-
-            # ==========================
             # SUCCESS RESPONSE
             # ==========================
 
@@ -470,6 +181,8 @@ def create_client(request):
             str(e)
 
         }, status=500)
+
+
 
 
 
@@ -654,6 +367,17 @@ def create_campaign(request):
     except Exception as e:
         return Response({"error": str(e)},status=500)
 
+
+    # =============================================
+    # SEND FIREBASE PUSH NOTIFICATION
+    # =============================================
+
+    send_push_notification(
+        "New Campaign Submitted",
+        # f"Campaign {campaign.campaign_id} submitted for client {client.name}"
+        f"{client.name} submitted the campaign for client ID {client.client_id}"
+    )
+
     return Response({"message": (
             "Campaign + LineItem + "
             "Creative + ThirdPartyCreative "
@@ -731,248 +455,6 @@ def get_campaign_by_id(request, campaign_id):  # http://127.0.0.1:8000/get_campa
 # =========================================================
 # UPDATE CAMPAIGN
 # =========================================================
-
-# @api_view(['GET', 'PUT'])
-# @parser_classes([MultiPartParser, FormParser])
-
-# def update_campaign(request, campaign_id):
-
-#     # =====================================================
-#     # FIND EXISTING CAMPAIGN
-#     # =====================================================
-
-#     try:
-
-#         campaign = Campaign.objects.select_related(
-#             'client'
-#         ).prefetch_related(
-#             'line_items__creatives_detail',
-#             'line_items__third_party_creatives'
-#         ).get(
-#             campaign_id=campaign_id
-#         )
-
-#     except Campaign.DoesNotExist:
-
-#         return Response(
-#             {"error": "Campaign not found"},
-#             status=404
-#         )
-
-#     # =====================================================
-#     # GET EXISTING DATA
-#     # =====================================================
-
-#     if request.method == 'GET':
-
-#         serializer = CampaignSerializer(
-#             campaign,
-#             context={'request': request}
-#         )
-
-#         return Response(serializer.data)
-
-#     # =====================================================
-#     # UPDATE DATA
-#     # =====================================================
-
-#     try:
-
-#         with transaction.atomic():
-
-#             # =============================================
-#             # UPDATE CAMPAIGN DETAILS
-#             # =============================================
-
-#             serializer = CampaignSerializer(
-#                 campaign,
-#                 data=request.data,
-#                 partial=True
-#             )
-
-#             if not serializer.is_valid():
-
-#                 return Response(
-#                     serializer.errors,
-#                     status=400
-#                 )
-
-#             serializer.save()
-
-#             # =============================================
-#             # GET LINE ITEMS
-#             # =============================================
-
-#             try:
-
-#                 line_items_data = json.loads(
-#                     request.data.get(
-#                         'line_items',
-#                         '[]'
-#                     )
-#                 )
-
-#             except Exception:
-
-#                 return Response(
-#                     {"error": "Invalid line_items JSON"},
-#                     status=400
-#                 )
-
-#             # =============================================
-#             # LOOP LINE ITEMS
-#             # =============================================
-
-#             for i, li in enumerate(line_items_data):
-
-#                 line_item_id = li.get(
-#                     'line_item_id'
-#                 )
-
-#                 if not line_item_id:
-#                     continue
-
-#                 # =========================================
-#                 # UPDATE / CREATE LINE ITEM
-#                 # =========================================
-
-#                 line_item, _ = LineItem.objects.update_or_create(
-
-#                     line_item_id=line_item_id,
-
-#                     defaults={
-
-#                         'campaign': campaign,
-#                         'line_item_name': li.get('lineItemName'),
-#                         'ethnicity': li.get('ethnicity',[]),
-#                         'start_date': parse_date(li.get('startDate')),
-#                         'end_date': parse_date(li.get('endDate')),
-#                         'ad_format': li.get('adFormat',[]),
-#                         'impressions': li.get('impressions') or None,
-#                         'units': li.get('units') or None,
-#                         'ctr': li.get('ctr') or None,
-#                         'viewability': li.get('viewability') or None,
-#                         'vcr': li.get('vcr') or None,
-#                         'unit_cost': li.get('unit_cost') or None,
-#                         'kpi_notes': li.get('kpi_notes', ''),
-#                         'unit_value': li.get('unit_value') or None,
-                       
-
-#                     }
-#                 )
-
-#                 # =========================================
-#                 # NORMAL CREATIVES
-#                 # =========================================
-
-#                 creatives_meta = li.get(
-#                     'creatives',
-#                     []
-#                 )
-
-#                 for j, meta in enumerate(creatives_meta):
-
-#                     if not meta.get(
-#                         'creative_name'
-#                     ):
-#                         continue
-
-#                     main_asset = request.FILES.get(
-#                         f'line_item_{i}main_asset{j}'
-#                     )
-
-#                     Creative.objects.create(
-
-#                         line_item=line_item,
-
-#                         creative_name=meta.get(
-#                             'creative_name',
-#                             ''
-#                         ),
-
-#                         main_asset=main_asset,
-
-#                         dimensions=meta.get(
-#                             'dimensions',
-#                             ''
-#                         ),
-
-#                         aspect_ratio=meta.get(
-#                             'aspect_ratio',
-#                             ''
-#                         ),
-
-#                         file_size=meta.get(
-#                             'file_size',
-#                             ''
-#                         ),
-
-#                         click_through_url=meta.get(
-#                             'click_through_url'
-#                         ) or None,
-
-#                         appended_html_tag=meta.get(
-#                             'appended_html_tag',
-#                             ''
-#                         ),
-
-#                         integration_code=meta.get(
-#                             'integration_code',
-#                             ''
-#                         ),
-
-#                         notes=meta.get(
-#                             'notes',
-#                             ''
-#                         ),
-#                     )
-
-#                 # =========================================
-#                 # THIRD PARTY CREATIVES
-#                 # =========================================
-
-#                 third_party_meta = li.get(
-#                     'third_party_creatives',
-#                     []
-#                 )
-
-#                 for k, _ in enumerate(third_party_meta):
-
-#                     input_file = request.FILES.get(
-#                         f'line_item_{i}thirdparty_file{k}'
-#                     )
-
-#                     backup_image = request.FILES.get(
-#                         f'line_item_{i}thirdparty_backup{k}'
-#                     )
-
-#                     ThirdPartyCreative.objects.create(
-
-#                         line_item=line_item,
-
-#                         input_file=input_file,
-
-#                         backup_image=backup_image,
-#                     )
-
-#     except Exception as e:
-
-#         return Response(
-#             {"error": str(e)},
-#             status=500
-#         )
-
-#     # =====================================================
-#     # SUCCESS RESPONSE
-#     # =====================================================
-
-#     return Response({
-
-#         "message": "Campaign updated successfully",
-
-#         "campaign_id": campaign.campaign_id,
-
-#     }, status=200) 
 
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 @api_view(['GET', 'PUT'])
@@ -1670,15 +1152,6 @@ def get_client_users(request):
         })
     return Response(data)
 
-# @api_view(['DELETE'])
-# def delete_client_user(request, id):
-#     try:
-#         user = User.objects.get(id=id, role='client')
-#     except User.DoesNotExist:
-#         return Response({"error": "Client user not found"}, status=404)
-#     user.delete()
-#     return Response({"message": "Deleted successfully"}, status=200)
-
 
 
 @api_view(['DELETE'])
@@ -1772,6 +1245,7 @@ def edit_client_user(request, id):
 # ---------------------------
 # Approve campaign function
 # ---------------------------
+from .notification import send_notification_to_client
 
 @api_view(['POST'])
 def approve_campaign(request, pk):
@@ -1792,12 +1266,90 @@ def approve_campaign(request, pk):
                 campaign.campaign_id = new_id
                 campaign.approval_status = 'approved'
                 campaign.save()
+                send_notification_to_client(campaign.client,
+                                            "Campaign Approved",
+                                            f"Your campaign {campaign.campaign_name} has been approved."
+                                            )
                 break
 
     return Response({
         "message": "Campaign approved",
         "campaign_id": campaign.campaign_id,
     }, status=200)
+
+
+
+# from .notification import send_push_notification_to_user
+# from .models import User
+
+# @api_view(['POST'])
+# def approve_campaign(request, pk):
+
+#     try:
+#         campaign = Campaign.objects.get(pk=pk)
+
+#     except Campaign.DoesNotExist:
+#         return Response(
+#             {"error": "Campaign not found"},
+#             status=404
+#         )
+
+#     if campaign.campaign_id:
+#         return Response(
+#             {"error": "Campaign already approved"},
+#             status=400
+#         )
+
+#     for i in range(5):
+
+#         with transaction.atomic():
+
+#             new_id = campaign.generate_campaign_id()
+
+#             if not Campaign.objects.filter(
+#                 campaign_id=new_id
+#             ).exists():
+
+#                 campaign.campaign_id = new_id
+#                 campaign.approval_status = 'approved'
+#                 campaign.save()
+
+#                 # ==================================
+#                 # SEND NOTIFICATION TO CLIENT
+#                 # ==================================
+
+#                 try:
+
+#                     client_user = User.objects.get(
+#                         client=campaign.client
+#                     )
+
+#                     send_push_notification_to_user(
+
+#                         client_user,
+
+#                         "Campaign Approved",
+
+#                         f"Your campaign {campaign.campaign_id} has been approved."
+
+#                     )
+
+#                 except User.DoesNotExist:
+
+#                     print(
+#                         f"No user found for client "
+#                         f"{campaign.client.name}"
+#                     )
+
+#                 break
+
+#     return Response(
+#         {
+#             "message": "Campaign approved",
+#             "campaign_id": campaign.campaign_id,
+#         },
+#         status=200
+#     )
 
 
 
@@ -1809,28 +1361,292 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.views.decorators.csrf import csrf_exempt
 import json
+from .models import FCMToken, User
 
-from .models import FCMToken
+# working perfectly
+
+# @api_view(['POST'])
+# @csrf_exempt
+# def save_fcm_token(request):
+#     print('User:', request.user)  # Check if user is authenticated
+
+#     try:
+
+#         data = json.loads(request.body)
+
+#         token = data.get("token")
+    
+
+#         if token:
+
+#             FCMToken.objects.get_or_create(token=token)
+
+#             return Response({"message":"Token Saved Successfully"}, status=200)
+
+#         return Response({"error":"Token Missing"}, status=400)
+
+#     except Exception as e:
+
+#         return Response({"error":str(e)}, status=500)
+
+
+
+
+# @api_view(['POST'])
+# @csrf_exempt
+# def save_fcm_token(request):
+
+#     try:
+
+#         data = json.loads(request.body)
+
+#         token = data.get("token")
+#         email = data.get("email")
+
+#         if not token:
+#             return Response(
+#                 {"error": "Token Missing"},
+#                 status=400
+#             )
+
+#         user = None
+
+#         if email:
+
+#             try:
+#                 user = User.objects.get(
+#                     email=email
+#                 )
+
+#             except User.DoesNotExist:
+#                 pass
+
+#         FCMToken.objects.update_or_create(
+
+#             token=token,
+
+#             defaults={
+#                 "user": user
+#             }
+#         )
+
+#         return Response(
+#             {
+#                 "message":
+#                 "Token Saved Successfully"
+#             },
+#             status=200
+#         )
+
+#     except Exception as e:
+
+#         return Response(
+#             {
+#                 "error": str(e)
+#             },
+#             status=500
+#         )
+
 
 
 @api_view(['POST'])
 @csrf_exempt
 def save_fcm_token(request):
-
     try:
-
         data = json.loads(request.body)
-
         token = data.get("token")
+        client_id = data.get("client_id")  # ← change from email to client_id
 
-        if token:
+        if not token:
+            return Response({"error": "Token Missing"}, status=400)
 
-            FCMToken.objects.get_or_create(token=token)
+        #user = None
+        client = None
+        if client_id:
+            try:
+                # Find the User linked to this client_id
+                from .models import Client  # adjust import to your app
+                client = Client.objects.get(client_id=client_id)
+                #user = User.objects.get(client=client)
+            except (Client.DoesNotExist):
+                pass
 
-            return Response({"message":"Token Saved Successfully"}, status=200)
+        FCMToken.objects.update_or_create(
+            token=token,
+            defaults={"client": client}
+        )
 
-        return Response({"error":"Token Missing"}, status=400)
+        return Response({"message": "Token Saved Successfully"}, status=200)
 
     except Exception as e:
+        return Response({"error": str(e)}, status=500)
 
-        return Response({"error":str(e)}, status=500)
+
+
+
+# ==========================================
+
+
+# Claude
+
+# @api_view(['POST'])
+# @csrf_exempt
+# def save_fcm_token(request):
+
+#     try:
+
+#         data = json.loads(request.body)
+#         token = data.get("token")
+
+#         if not token:
+#             return Response({"error": "Token Missing"}, status=400)
+
+#         # Duplicate check — already exists skip
+#         obj, created = FCMToken.objects.get_or_create(token=token)
+
+#         if created:
+#             print(f"New token saved: {token[:20]}...")
+#         else:
+#             print(f"Token already exists, skip")
+
+#         return Response({"message": "Token Saved Successfully"}, status=200)
+
+#     except Exception as e:
+#         return Response({"error": str(e)}, status=500)
+
+# ===============================================
+
+# Claude
+
+# ==============================
+# CHAT HISTORY API
+# ==============================
+
+# from .models import ChatRoom, Message
+# from .serializers import MessageSerializer
+
+# @api_view(['GET'])
+# def get_chat_history(request, campaign_id):
+
+#     try:
+
+#         # ==========================
+#         # FIND CHAT ROOM
+#         # ==========================
+
+#         try:
+#             room = ChatRoom.objects.get(
+#                 campaign__campaign_id=campaign_id
+#             )
+#         except ChatRoom.DoesNotExist:
+#             return Response([], status=200)
+
+#         # ==========================
+#         # GET MESSAGES
+#         # ==========================
+
+#         messages = Message.objects.filter(
+#             room=room
+#         ).select_related(
+#             'sender'
+#         ).order_by('timestamp')  # oldest first → WhatsApp style
+
+#         serializer = MessageSerializer(
+#             messages,
+#             many=True
+#         )
+
+#         return Response(serializer.data, status=200)
+
+#     except Exception as e:
+#         return Response(
+#             {"error": str(e)},
+#             status=500
+#         )
+
+
+# # ==============================
+# # MARK MESSAGES AS READ
+# # ==============================
+
+# @api_view(['POST'])
+# def mark_messages_read(request, campaign_id):
+
+#     try:
+
+#         room = ChatRoom.objects.get(
+#             campaign__campaign_id=campaign_id
+#         )
+
+#         Message.objects.filter(
+#             room=room,
+#             is_read=False,
+#             sender_type='client'
+#         ).update(is_read=True)
+
+#         return Response(
+#             {"message": "Marked as read"},
+#             status=200
+#         )
+
+#     except ChatRoom.DoesNotExist:
+#         return Response(
+#             {"error": "Room not found"},
+#             status=404
+#         )
+
+#     except Exception as e:
+#         return Response(
+#             {"error": str(e)},
+#             status=500
+#         )
+
+
+# # ==============================
+# # GET ALL CHAT ROOMS (Admin view)
+# # ==============================
+
+# @api_view(['GET'])
+# def get_all_chat_rooms(request):
+
+#     try:
+
+#         rooms = ChatRoom.objects.select_related(
+#             'campaign',
+#             'client'
+#         ).all().order_by('-created_at')
+
+#         data = []
+
+#         for room in rooms:
+
+       
+#             last_message = Message.objects.filter(
+#                 room=room
+#             ).order_by('-timestamp').first()
+
+#             # Unread count
+#             unread_count = Message.objects.filter(
+#                 room=room,
+#                 is_read=False,
+#                 sender_type='client'
+#             ).count()
+
+#             data.append({
+#                 "room_id":       room.id,
+#                 "campaign_id":   room.campaign.campaign_id,
+#                 "campaign_name": room.campaign.campaign_name,
+#                 "client_id":     room.client.client_id,
+#                 "client_name":   room.client.name,
+#                 "last_message":  last_message.content if last_message else None,
+#                 "last_time":     last_message.timestamp.isoformat() if last_message else None,
+#                 "unread_count":  unread_count,
+#             })
+
+#         return Response(data, status=200)
+
+#     except Exception as e:
+#         return Response(
+#             {"error": str(e)},
+#             status=500
+#         )

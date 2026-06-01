@@ -1,13 +1,12 @@
-from django.urls import re_path
-from .consumer import NotificationConsumer
 
-# Websocket Url mapping 
+# Claude
 
-websocket_urlpatterns = [
+# from django.urls import re_path             # It handle websocket request (ws://localhost:8000/ws/chat/CAMP001/)
+# from .consumer import ChatConsumer          
 
-    re_path(
-        r'ws/notifications/$',
-        NotificationConsumer.as_asgi()
-    ),
-
-]
+# websocket_urlpatterns = [
+#     re_path(
+#         r'ws/chat/(?P<campaign_id>[^/]+)/$',  # 'r' means raw string (Regex pattern) - dynamic parameter
+#         ChatConsumer.as_asgi()
+#     ),
+# ]

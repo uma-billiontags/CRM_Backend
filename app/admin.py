@@ -14,4 +14,7 @@ admin.site.register(Campaign)
 admin.site.register(LineItem)
 admin.site.register(Creative)
 admin.site.register(TeamAccess) 
+#from .models import ChatRoom, Message
 
+#admin.site.register(ChatRoom)
+#admin.site.register(Message)

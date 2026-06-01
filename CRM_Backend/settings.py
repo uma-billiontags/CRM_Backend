@@ -36,7 +36,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    'daphne',
+    #'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'app', 
     'rest_framework',
     'corsheaders',
-    'channels',   # enabled websocket support     
+    #'channels',   # enabled websocket support     
 
 ]
 
@@ -203,18 +203,18 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Django Notifications  
 
-ASGI_APPLICATION = 'CRM_Backend.asgi.application'
+# ASGI_APPLICATION = 'CRM_Backend.asgi.application'
 
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
 
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
+#         "CONFIG": {
+#             "hosts": [("127.0.0.1", 6379)],
+#         },
+#     },
+# }
 
 
 
