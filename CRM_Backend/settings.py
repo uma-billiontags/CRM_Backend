@@ -36,7 +36,7 @@ ALLOWED_HOSTS = ['*']
 # Application definition
 
 INSTALLED_APPS = [
-    #'daphne',
+    # 'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'app', 
     'rest_framework',
     'corsheaders',
-    #'channels',   # enabled websocket support     
+    'channels',   # enabled websocket support     
 
 ]
 
@@ -83,31 +83,29 @@ WSGI_APPLICATION = 'CRM_Backend.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-'''
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-'''
 
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
-        'OPTIONS': {
-            'ssl': {
-                'ca': os.path.join(BASE_DIR, 'ca.pem'),
-            }
-        }
-    }
-}
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': os.getenv('DB_NAME'),
+#         'USER': os.getenv('DB_USER'),
+#         'PASSWORD': os.getenv('DB_PASSWORD'),
+#         'HOST': os.getenv('DB_HOST'),
+#         'PORT': os.getenv('DB_PORT'),
+#         'OPTIONS': {
+#             'ssl': {
+#                 'ca': os.path.join(BASE_DIR, 'ca.pem'),
+#             }
+#         }
+#     }
+# }
  
 
 # Password validation
@@ -138,7 +136,7 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_TZ = False
 
 
 # Static files (CSS, JavaScript, Images)
@@ -203,7 +201,7 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # Django Notifications  
 
-# ASGI_APPLICATION = 'CRM_Backend.asgi.application'
+ASGI_APPLICATION = 'CRM_Backend.asgi.application'
 
 
 # CHANNEL_LAYERS = {
@@ -215,6 +213,12 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 #         },
 #     },
 # }
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
+    }
+}
 
 
 

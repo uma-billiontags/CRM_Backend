@@ -33,9 +33,11 @@ urlpatterns = [
     path('save_fcm_token/', views.save_fcm_token, name='save_fcm_token'),
 
     # Claude
-    # path('get_chat_history/<str:campaign_id>/', views.get_chat_history, name='get_chat_history'),
-    # path('mark_messages_read/<str:campaign_id>/', views.mark_messages_read, name='mark_messages_read'),
-    # path('get_all_chat_rooms/', views.get_all_chat_rooms, name='get_all_chat_rooms'),
+    path('get_chat_history/<str:campaign_id>/', views.get_chat_history, name='get_chat_history'),
+    path('mark_messages_read/<str:campaign_id>/', views.mark_messages_read, name='mark_messages_read'),
+    path('get_all_chat_rooms/', views.get_all_chat_rooms, name='get_all_chat_rooms'),
+    
+    path('send_chat_file/<str:campaign_id>/', views.send_chat_file, name='send_chat_file'),
 
     
 
