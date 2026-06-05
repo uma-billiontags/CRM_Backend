@@ -140,6 +140,8 @@ class CreativeSerializer(serializers.ModelSerializer):
             'integration_code',
             'notes',
             'uploaded_at',
+            
+            'creative_id',
         ]
 
         read_only_fields = [
@@ -177,6 +179,8 @@ class ThirdPartyCreativeSerializer(serializers.ModelSerializer):
             'backup_image',
             'backup_image_url',
             'uploaded_at',
+            
+            'creative_id',
         ]
 
         read_only_fields = [

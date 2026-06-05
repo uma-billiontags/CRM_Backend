@@ -419,6 +419,8 @@ class Creative(models.Model):
     notes = models.TextField(blank=True)
 
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    creative_id = models.CharField(max_length=100, blank=True, null=True)  # ← ADD THIS
 
     class Meta:
         ordering = ['-uploaded_at']
@@ -441,6 +443,8 @@ class ThirdPartyCreative(models.Model):
     # Backup image
     backup_image = models.FileField(upload_to='thirdparty/backup/',blank=True,null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    creative_id = models.CharField(max_length=100, blank=True, null=True)  # ← ADD THIS
 
     class Meta:
         ordering = ['-uploaded_at']

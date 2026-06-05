@@ -865,6 +865,7 @@ def login_view(request):
             "email":     user.email,
             "role":      user.role,
             "client_id": user.client.client_id if user.client else None,     # If user linked with client: return client id otherwise return None
+            "client_name": user.client.name if user.client else None,  # ← ADD THIS
             "source":    "user",
         }
     }, status=200)
@@ -890,7 +891,7 @@ def download_creative(request, creative_id):
 
 
     # Return downloadable response
-    return FileResponse(open(file_path, 'rb'),as_attachment=False,content_type=mime_type) 
+    return FileResponse(open(file_path, 'rb'),as_attachment=True,content_type=mime_type) 
 
 
 # Third party function
@@ -1252,7 +1253,6 @@ from .notification import send_notification_to_client
 @api_view(['POST'])
 def approve_campaign(request, pk):
     try:
-        # Find by DB primary key or campaign_id (if already set)
         campaign = Campaign.objects.get(pk=pk)
     except Campaign.DoesNotExist:
         return Response({"error": "Campaign not found"}, status=404)
@@ -1260,26 +1260,47 @@ def approve_campaign(request, pk):
     if campaign.campaign_id:
         return Response({"error": "Campaign already approved"}, status=400)
 
-    # Generate ID now
-    for i in range(5):
+    try:
         with transaction.atomic():
             new_id = campaign.generate_campaign_id()
-            if not Campaign.objects.filter(campaign_id=new_id).exists():
-                campaign.campaign_id = new_id
-                campaign.approval_status = 'approved'
-                campaign.save()
-                send_notification_to_client(campaign.client,
-                                            "Campaign Approved",
-                                            f"Your campaign {campaign.campaign_name} has been approved."
-                                            )
-                break
 
-    return Response({
-        "message": "Campaign approved",
-        "campaign_id": campaign.campaign_id,
-    }, status=200)
+            # Extra safety: ensure uniqueness
+            counter = 1
+            original_id = new_id
+            while Campaign.objects.filter(campaign_id=new_id).exists():
+                # Increment last number manually
+                parts = new_id.split('-')
+                num = int(parts[-1]) + counter
+                new_id = f"{'-'.join(parts[:-1])}-{str(num).zfill(5)}"
+                counter += 1
 
+            # Assign and save
+            campaign.campaign_id = new_id
+            campaign.approval_status = 'approved'
+            campaign.save()   # This is critical
 
+            # Send notification
+            send_notification_to_client(
+                campaign.client,
+                "Campaign Approved",
+                f"Your campaign {campaign.campaign_name} has been approved with ID: {new_id}"
+            )
+
+            print(f"✅ Campaign approved successfully: {new_id}")  # For debugging
+
+            return Response({
+                "message": "Campaign approved successfully",
+                "campaign_id": campaign.campaign_id,
+            }, status=200)
+
+    except Exception as e:
+        import traceback
+        print("❌ Approve Campaign Error:")
+        print(traceback.format_exc())
+        return Response({
+            "error": str(e),
+            "details": "Check server logs for full traceback"
+        }, status=500)
 
 # from .notification import send_push_notification_to_user
 # from .models import User
@@ -1737,5 +1758,44 @@ def send_chat_file(request, campaign_id):
             "message_type": message_type,
         }, status=201)
 
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+#------------------------------New-------------------------------
+@api_view(['PATCH'])
+def update_creative_id(request):
+    creative_type = request.data.get('type')      # 'standard' or 'third_party'
+    creative_db_id = request.data.get('id')       # DB primary key (integer)
+    creative_id_value = request.data.get('creative_id', '').strip()
+
+    if not creative_db_id or not creative_type:
+        return Response({"error": "id and type are required"}, status=400)
+
+    try:
+        if creative_type == 'standard':
+            obj = Creative.objects.get(id=creative_db_id)
+            obj.creative_id = creative_id_value
+            obj.save()
+            return Response({
+                "message": "Creative ID Added Successfully",
+                "id": obj.id,
+                "creative_id": obj.creative_id,
+            }, status=200)
+
+        elif creative_type == 'third_party':
+            obj = ThirdPartyCreative.objects.get(id=creative_db_id)
+            obj.creative_id = creative_id_value
+            obj.save()
+            return Response({
+                "message": "Creative ID Added Successfully",
+                "id": obj.id,
+                "creative_id": obj.creative_id,
+            }, status=200)
+
+        else:
+            return Response({"error": "Invalid type. Use 'standard' or 'third_party'"}, status=400)
+
+    except (Creative.DoesNotExist, ThirdPartyCreative.DoesNotExist):
+        return Response({"error": "Creative not found"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=500)

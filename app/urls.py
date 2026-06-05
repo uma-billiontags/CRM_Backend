@@ -38,6 +38,10 @@ urlpatterns = [
     path('get_all_chat_rooms/', views.get_all_chat_rooms, name='get_all_chat_rooms'),
     
     path('send_chat_file/<str:campaign_id>/', views.send_chat_file, name='send_chat_file'),
+    
+    # Creative
+    path('update_creative_id/', views.update_creative_id, name='update_creative_id'),
+    
 
     
 
