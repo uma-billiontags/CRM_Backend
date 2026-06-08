@@ -266,7 +266,7 @@ class ClientClassification(models.Model):
 
 class Campaign(models.Model):
 
-    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="campaigns") # link one client have multiple campagins
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name="campaigns")
 
     advertiser = models.CharField(max_length=200)
     website_url = models.URLField(blank=True, null=True)
@@ -283,9 +283,8 @@ class Campaign(models.Model):
     end_date = models.DateField()
 
     # Auto-generated field
-    campaign_id = models.CharField(max_length=100, unique=True, editable=False, null=True, blank=True)
+    campaign_id = models.CharField(max_length=20, unique=True, editable=False, null=True, blank=True)
 
-    # Add approval status
     approval_status = models.CharField(
         max_length=20,
         choices=[('pending', 'Pending'), ('approved', 'Approved')],
@@ -294,15 +293,6 @@ class Campaign(models.Model):
         
     notes = models.TextField(blank=True, null=True)
 
-    age = models.CharField(max_length=50)
-    gender = models.CharField(max_length=50)
-
-    geo_targeting = models.TextField()
-    platforms = models.CharField(max_length=300)
-
-    frequency_cap = models.PositiveIntegerField(blank=True, null=True)
-    brand_safety = models.CharField(max_length=20)
-    viewability_goal = models.PositiveIntegerField(blank=True, null=True)
     new_cpm = models.FloatField(null=True, blank=True)
     new_price = models.FloatField(null=True, blank=True)
 
@@ -311,32 +301,30 @@ class Campaign(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-    #  FIXED generator
+    # ==================== CAMPAIGN ID GENERATOR (CA00001) ====================
     def generate_campaign_id(self):
-        year = datetime.now().year
+        # Get the highest campaign_id starting with 'CA'
+        last_campaign = Campaign.objects.filter(
+            campaign_id__startswith='CA'
+        ).order_by('-campaign_id').first()
 
-        last = Campaign.objects.filter(campaign_id__startswith=f"CMP-{year}").order_by('id').last() # CMP-2026
-
-        if last and last.campaign_id:     #  if last campaign id is CMP-2026-00025
-            last_num = int(last.campaign_id.split('-')[-1]) # then split('-') → ['CMP', '2026', '00025'] & [-1] → '00025' & int(25)
-
-            new_num = last_num + 1 # 25 + 1 = 26 
+        if last_campaign and last_campaign.campaign_id:
+            try:
+                # Extract number part: CA00123 → 123
+                last_num = int(last_campaign.campaign_id[2:])
+                new_num = last_num + 1
+            except ValueError:
+                new_num = 1
         else:
-            new_num = 1 # or else it create first campaign of the year
+            new_num = 1
 
-        return f"CMP-{year}-{str(new_num).zfill(5)}"
-
-    # FIXED save method (INSIDE CLASS)
+        return f"CA{str(new_num).zfill(5)}"   # CA00001, CA00002, ...
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
 
     def __str__(self): 
-        return f"{self.campaign_name} ({self.client.name})"
-
-
-
-
+        return f"{self.campaign_name} ({self.campaign_id or 'Pending'})"
 # ==== Add Line Item ====
 
 class LineItem(models.Model):
@@ -368,6 +356,14 @@ class LineItem(models.Model):
     kpi_notes = models.TextField(null=True, blank=True)
     unit_value = models.FloatField(null=True, blank=True)
 
+    # ── NEW targeting fields ──
+    age = models.CharField(max_length=200, blank=True, null=True)
+    gender = models.CharField(max_length=100, blank=True, null=True)
+    geo_targeting = models.TextField(blank=True, null=True)
+    platforms = models.CharField(max_length=300, blank=True, null=True)
+    frequency_cap = models.PositiveIntegerField(blank=True, null=True)
+    brand_safety = models.CharField(max_length=20, blank=True, null=True)
+    viewability_goal = models.PositiveIntegerField(blank=True, null=True)
    
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -586,3 +582,72 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.sender_type} → {self.room} → {self.timestamp:%Y-%m-%d %H:%M}"
+    
+    
+class InsertionOrder(models.Model):
+    io_id = models.CharField(max_length=20, unique=True, editable=False)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='insertion_orders')
+    campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE, related_name='insertion_order')
+    pdf_file = models.FileField(upload_to='insertion_orders/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def generate_io_id(self):
+        last = InsertionOrder.objects.order_by('-id').first()
+        if last and last.io_id:
+            try:
+                last_num = int(last.io_id[2:])  # Strip "IO" → get number
+                new_num = last_num + 1
+            except ValueError:
+                new_num = 1
+        else:
+            new_num = 1
+        return f"IO{str(new_num).zfill(5)}"  # IO00001, IO00002...
+
+    def save(self, *args, **kwargs):
+        if not self.io_id:
+            self.io_id = self.generate_io_id()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.io_id} → {self.campaign.campaign_id}"
+    
+    
+class Invoice(models.Model):
+    invoice_id = models.CharField(max_length=20, unique=True, editable=False)
+    client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='invoices')
+    campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE, related_name='invoice')
+    generated_at = models.DateTimeField(auto_now_add=True)
+
+    def generate_invoice_id(self):
+        last = Invoice.objects.order_by('-id').first()
+        if last and last.invoice_id:
+            try:
+                last_num = int(last.invoice_id[3:])  # Strip "BTU" → get number
+                new_num = last_num + 1
+            except ValueError:
+                new_num = 1
+        else:
+            new_num = 1
+        return f"BTU{str(new_num).zfill(6)}"  # BTU000001, BTU000002...
+
+    def save(self, *args, **kwargs):
+        if not self.invoice_id:
+            self.invoice_id = self.generate_invoice_id()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.invoice_id} → {self.campaign.campaign_id}"
+    
+
+class CampaignExcel(models.Model):
+    campaign = models.OneToOneField(
+        Campaign,
+        on_delete=models.CASCADE,
+        related_name='excel_report'
+    )
+    excel_file = models.FileField(upload_to='excel_reports/')
+    generated_at = models.DateTimeField(auto_now=True)
+ 
+    def __str__(self):
+        return f"Excel - {self.campaign.campaign_id}"
+ 

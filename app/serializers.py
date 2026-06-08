@@ -243,8 +243,7 @@ class CampaignSerializer(serializers.ModelSerializer):
     class Meta:
         model = Campaign
         fields = '__all__'
-        read_only_fields = ['campaign_id']
-
+        read_only_fields = ['campaign_id', 'created_at']  # ← add created_at too
 
 # --------------------------------------------------------------------
 
@@ -299,3 +298,31 @@ class MessageSerializer(serializers.ModelSerializer):
         if obj.file and request:
             return request.build_absolute_uri(obj.file.url)
         return None
+    
+
+class InsertionOrderSerializer(serializers.ModelSerializer):
+    campaign_id = serializers.CharField(source='campaign.campaign_id', read_only=True)
+    client_id = serializers.CharField(source='client.client_id', read_only=True)
+    pdf_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InsertionOrder
+        fields = ['id', 'io_id', 'client_id', 'campaign_id', 'pdf_file', 'pdf_url', 'created_at']
+        read_only_fields = ['io_id', 'created_at']
+
+    def get_pdf_url(self, obj):
+        request = self.context.get('request')
+        if obj.pdf_file and request:
+            return request.build_absolute_uri(obj.pdf_file.url)
+        return None
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    campaign_id = serializers.CharField(source='campaign.campaign_id', read_only=True)
+    client_id = serializers.CharField(source='client.client_id', read_only=True)
+    campaign_name = serializers.CharField(source='campaign.campaign_name', read_only=True)
+    campaign_end_date = serializers.DateField(source='campaign.end_date', read_only=True)
+
+    class Meta:
+        model = Invoice
+        fields = ['id', 'invoice_id', 'client_id', 'campaign_id', 'campaign_name', 'campaign_end_date', 'generated_at']
+        read_only_fields = ['invoice_id', 'generated_at']

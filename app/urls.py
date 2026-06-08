@@ -42,6 +42,18 @@ urlpatterns = [
     # Creative
     path('update_creative_id/', views.update_creative_id, name='update_creative_id'),
     
+    path('save_insertion_order/', views.save_insertion_order, name='save_insertion_order'),
+    path('get_all_insertion_orders/', views.get_all_insertion_orders, name='get_all_insertion_orders'),
+    path('get_insertion_orders_by_client/<str:client_id>/', views.get_insertion_orders_by_client, name='get_insertion_orders_by_client'),
+    
+    path('generate_invoice/', views.generate_invoice, name='generate_invoice'),
+    path('get_all_invoices/', views.get_all_invoices, name='get_all_invoices'),
+    path('get_invoices_by_client/<str:client_id>/', views.get_invoices_by_client, name='get_invoices_by_client'),
+    
+    path('generate_campaign_excel/<str:campaign_id>/', views.generate_campaign_excel, name='generate_campaign_excel'),
+    path('download_campaign_excel/<str:campaign_id>/', views.download_campaign_excel, name='download_campaign_excel'),
+    path('get_campaigns_excel_list/', views.get_campaigns_excel_list, name='get_campaigns_excel_list'),
+    
 
     
 

@@ -325,6 +325,14 @@ def create_campaign(request):
                         'unit_cost': li.get('unit_cost') or None,
                         'kpi_notes': li.get('kpi_notes', ''),
                         'unit_value': li.get('unit_value') or None,
+                        
+                        'age':            li.get('age', ''),
+                        'gender':         li.get('gender', ''),
+                        'geo_targeting':  li.get('geo_targeting', ''),
+                        'platforms':      li.get('platforms', ''),
+                        'frequency_cap':  li.get('frequency_cap') or None,
+                        'brand_safety':   li.get('brand_safety', ''),
+                        'viewability_goal': li.get('viewability_goal') or None,
 
 
                     }
@@ -629,7 +637,15 @@ def update_campaign(request, campaign_id):
 
                         'unit_value':
                         li.get('unit_value') or None,
-                    }
+                        
+                        'age':            li.get('age', ''),
+                        'gender':         li.get('gender', ''),
+                        'geo_targeting':  li.get('geo_targeting', ''),
+                        'platforms':      li.get('platforms', ''),
+                        'frequency_cap':  li.get('frequency_cap') or None,
+                        'brand_safety':   li.get('brand_safety', ''),
+                        'viewability_goal': li.get('viewability_goal') or None,
+            }
                 )
 
                 # =============================================
@@ -1256,9 +1272,13 @@ def approve_campaign(request, pk):
         campaign = Campaign.objects.get(pk=pk)
     except Campaign.DoesNotExist:
         return Response({"error": "Campaign not found"}, status=404)
-
-    if campaign.campaign_id:
+    
+    # ✅ Check approval_status instead of campaign_id
+    if campaign.approval_status == 'approved':
         return Response({"error": "Campaign already approved"}, status=400)
+
+    # if campaign.campaign_id:
+    #     return Response({"error": "Campaign already approved"}, status=400)
 
     try:
         with transaction.atomic():
@@ -1799,3 +1819,365 @@ def update_creative_id(request):
         return Response({"error": "Creative not found"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+
+
+from .models import InsertionOrder
+from .serializers import InsertionOrderSerializer
+
+# Save IO (called when user downloads/generates IO)
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def save_insertion_order(request):
+    campaign_id = request.data.get('campaign_id')
+    pdf_file = request.FILES.get('pdf_file')
+
+    if not campaign_id:
+        return Response({"error": "campaign_id is required"}, status=400)
+
+    try:
+        campaign = Campaign.objects.get(campaign_id=campaign_id)
+    except Campaign.DoesNotExist:
+        return Response({"error": "Campaign not found"}, status=404)
+
+    # If IO already exists for this campaign, update it
+    existing = InsertionOrder.objects.filter(campaign=campaign).first()
+    if existing:
+        if pdf_file:
+            existing.pdf_file = pdf_file
+            existing.save()
+        serializer = InsertionOrderSerializer(existing, context={'request': request})
+        return Response(serializer.data, status=200)
+
+    # Create new IO
+    io = InsertionOrder.objects.create(
+        client=campaign.client,
+        campaign=campaign,
+        pdf_file=pdf_file
+    )
+    serializer = InsertionOrderSerializer(io, context={'request': request})
+    return Response(serializer.data, status=201)
+
+
+# Get all IOs
+@api_view(['GET'])
+def get_all_insertion_orders(request):
+    ios = InsertionOrder.objects.select_related('client', 'campaign').order_by('-created_at')
+    serializer = InsertionOrderSerializer(ios, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+# Get IOs by client
+@api_view(['GET'])
+def get_insertion_orders_by_client(request, client_id):
+    ios = InsertionOrder.objects.filter(
+        client__client_id=client_id
+    ).select_related('client', 'campaign').order_by('-created_at')
+    serializer = InsertionOrderSerializer(ios, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+from .models import Invoice
+from .serializers import InvoiceSerializer
+from datetime import date
+
+# ==============================
+# GENERATE INVOICE
+# Called when campaign end date has passed
+# ==============================
+@api_view(['POST'])
+def generate_invoice(request):
+    campaign_id = request.data.get('campaign_id')
+
+    if not campaign_id:
+        return Response({"error": "campaign_id is required"}, status=400)
+
+    try:
+        campaign = Campaign.objects.get(campaign_id=campaign_id)
+    except Campaign.DoesNotExist:
+        return Response({"error": "Campaign not found"}, status=404)
+
+    # ── Check campaign is approved ──
+    if campaign.approval_status != 'approved':
+        return Response({"error": "Campaign is not approved yet"}, status=400)
+
+    # ── Check end date has passed ──
+    if not campaign.end_date:
+        return Response({"error": "Campaign has no end date"}, status=400)
+
+    if campaign.end_date > date.today():
+        return Response({
+            "error": "Invoice cannot be generated before campaign end date",
+            "end_date": str(campaign.end_date)
+        }, status=400)
+
+    # ── If invoice already exists, return it ──
+    existing = Invoice.objects.filter(campaign=campaign).first()
+    if existing:
+        serializer = InvoiceSerializer(existing, context={'request': request})
+        return Response(serializer.data, status=200)
+
+    # ── Create new invoice ──
+    invoice = Invoice.objects.create(
+        client=campaign.client,
+        campaign=campaign,
+    )
+    serializer = InvoiceSerializer(invoice, context={'request': request})
+    return Response(serializer.data, status=201)
+
+
+# ==============================
+# GET ALL INVOICES
+# ==============================
+@api_view(['GET'])
+def get_all_invoices(request):
+    invoices = Invoice.objects.select_related('client', 'campaign').order_by('-generated_at')
+    serializer = InvoiceSerializer(invoices, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+# ==============================
+# GET INVOICES BY CLIENT
+# Only returns invoices where campaign end date has passed
+# ==============================
+@api_view(['GET'])
+def get_invoices_by_client(request, client_id):
+    today = date.today()
+    invoices = Invoice.objects.filter(
+        client__client_id=client_id,
+        campaign__end_date__lte=today,           # end date passed
+        campaign__approval_status='approved',     # only approved
+    ).select_related('client', 'campaign').order_by('-generated_at')
+
+    serializer = InvoiceSerializer(invoices, many=True, context={'request': request})
+    return Response(serializer.data)
+
+# ==============================
+# ADD THESE TO YOUR views.py
+# ==============================
+
+import io
+import json
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from django.http import FileResponse, HttpResponse
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from .models import Campaign, CampaignExcel
+from django.core.files.base import ContentFile
+
+
+def build_campaign_excel(campaign) -> bytes:
+    """
+    Build an Excel workbook for the given campaign.
+    One sheet per line item, matching the uploaded template format.
+    Returns the workbook as bytes.
+    """
+    wb = Workbook()
+    wb.remove(wb.active)  # remove default empty sheet
+
+    # ── Styles ──
+    header_font   = Font(name='Arial', bold=True, size=10)
+    value_font    = Font(name='Arial', size=10)
+    label_fill    = PatternFill('solid', start_color='D9E1F2')   # light blue
+    title_fill    = PatternFill('solid', start_color='1F4E79')   # dark blue header
+    title_font    = Font(name='Arial', bold=True, size=10, color='FFFFFF')
+    border_side   = Side(style='thin', color='B8CCE4')
+    thin_border   = Border(
+        left=border_side, right=border_side,
+        top=border_side,  bottom=border_side,
+    )
+    center_align  = Alignment(horizontal='center', vertical='center')
+    left_align    = Alignment(horizontal='left',   vertical='center', wrap_text=True)
+
+    line_items = campaign.line_items.all()
+
+    for li in line_items:
+        # Sheet name = Line Item ID (max 31 chars, Excel limit)
+        sheet_name = str(li.line_item_id)[:31]
+        ws = wb.create_sheet(title=sheet_name)
+
+        # ── Column widths ──
+        ws.column_dimensions['A'].width = 22
+        ws.column_dimensions['B'].width = 40
+
+        # ── Title row ──
+        ws.merge_cells('A1:B1')
+        ws['A1'] = f"Campaign Report — {campaign.campaign_id}"
+        ws['A1'].font    = title_font
+        ws['A1'].fill    = title_fill
+        ws['A1'].alignment = center_align
+        ws.row_dimensions[1].height = 22
+        
+        # Get IO linked to this campaign (OneToOne)
+        insertion_order = getattr(campaign, 'insertion_order', None)
+
+        # ── Data rows: (label, value) pairs ──
+        rows = [
+            ('Date of ID Setup',    campaign.created_at.strftime('%d-%B-%Y') if campaign.created_at else ''),
+            ('Advertiser ID',       campaign.client.client_id if campaign.client else ''),
+            ('Campaign ID',         campaign.campaign_id or ''),
+            ('IO ID',               insertion_order.io_id if insertion_order else ''),
+            ('IO Name',             campaign.campaign_name or ''),
+            ('Impressions Booked',  li.impressions or ''),
+            ('Start Date',          str(li.start_date) if li.start_date else ''),
+            ('End Date',            str(li.end_date)   if li.end_date   else ''),
+            ('Target CPM',          ''),
+            ('Target CTR',          f"{li.ctr}%" if li.ctr else ''),
+            ('Line Item ID',        li.line_item_id or ''),
+            ('Line Item Name',      li.line_item_name or ''),
+            ('Ethnicity',           li.ethnicity or ''),
+            ('Ad Format',           li.ad_format or ''),
+            ('Geography',           _parse_geo(li.geo_targeting) if li.geo_targeting else ''),
+            ('Market',              ''),
+            ('Viewability',         f"{li.viewability}%" if li.viewability else ''),
+            ('Creative',            ''),
+            ('VCR',                 f"{li.vcr}%"         if li.vcr        else ''),
+            ('KPI',                 li.kpi_notes or ''),
+            ('Sitelist',            ''),
+        ]
+
+        for i, (label, value) in enumerate(rows, start=2):
+            label_cell = ws.cell(row=i, column=1, value=label)
+            value_cell = ws.cell(row=i, column=2, value=value)
+
+            # Label styling
+            label_cell.font      = header_font
+            label_cell.fill      = label_fill
+            label_cell.alignment = left_align
+            label_cell.border    = thin_border
+
+            # Value styling
+            value_cell.font      = value_font
+            value_cell.alignment = left_align
+            value_cell.border    = thin_border
+
+            ws.row_dimensions[i].height = 18
+
+    # ── Save to bytes ──
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer.read()
+
+
+def _parse_geo(geo_targeting):
+    """Parse geo_targeting field (JSON string or list) into readable string."""
+    try:
+        if isinstance(geo_targeting, str):
+            data = json.loads(geo_targeting)
+        else:
+            data = geo_targeting
+        parts = []
+        for loc in (data if isinstance(data, list) else [data]):
+            segment = ', '.join(filter(None, [
+                loc.get('country', ''), loc.get('state', ''), loc.get('city', '')
+            ]))
+            if segment:
+                parts.append(segment)
+        return ' | '.join(parts) if parts else ''
+    except Exception:
+        return str(geo_targeting) if geo_targeting else ''
+
+
+# ── Generate & store Excel ──────────────────────────────────────────────────
+
+@api_view(['POST'])
+def generate_campaign_excel(request, campaign_id):
+    """
+    Generate the Excel file for a campaign, save it to DB, return download URL.
+    POST /generate_campaign_excel/<campaign_id>/
+    """
+    try:
+        campaign = Campaign.objects.select_related(
+            'client', 'insertion_order'
+        ).prefetch_related(
+            'line_items'
+        ).get(campaign_id=campaign_id)
+    except Campaign.DoesNotExist:
+        return Response({'error': 'Campaign not found'}, status=404)
+
+    excel_bytes = build_campaign_excel(campaign)
+    filename    = f"{campaign_id}.xlsx"
+
+    # Save / overwrite in DB
+    excel_obj, _ = CampaignExcel.objects.get_or_create(campaign=campaign)
+    excel_obj.excel_file.save(filename, ContentFile(excel_bytes), save=True)
+
+    url = request.build_absolute_uri(excel_obj.excel_file.url)
+    return Response({
+        'message':      'Excel generated successfully',
+        'campaign_id':  campaign_id,
+        'download_url': url,
+        'filename':     filename,
+        'generated_at': excel_obj.generated_at.isoformat(),
+    }, status=200)
+
+
+# ── Download saved Excel ────────────────────────────────────────────────────
+
+@api_view(['GET'])
+def download_campaign_excel(request, campaign_id):
+    """
+    Stream the saved Excel file directly.
+    GET /download_campaign_excel/<campaign_id>/
+    """
+    try:
+        excel_obj = CampaignExcel.objects.get(campaign__campaign_id=campaign_id)
+    except CampaignExcel.DoesNotExist:
+        # Generate on-the-fly if not saved yet
+        try:
+            campaign = Campaign.objects.select_related(
+                'client', 'insertion_order'
+            ).prefetch_related(
+                'line_items'
+            ).get(campaign_id=campaign_id)
+        except Campaign.DoesNotExist:
+            return Response({'error': 'Campaign not found'}, status=404)
+
+        excel_bytes = build_campaign_excel(campaign)
+        response = HttpResponse(
+            excel_bytes,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{campaign_id}.xlsx"'
+        return response
+
+    response = FileResponse(
+        excel_obj.excel_file.open('rb'),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{campaign_id}.xlsx"'
+    return response
+
+
+# ── List all campaigns with Excel status ───────────────────────────────────
+
+@api_view(['GET'])
+def get_campaigns_excel_list(request):
+    """
+    Returns all approved campaigns with their Excel download status.
+    GET /get_campaigns_excel_list/
+    """
+    campaigns = Campaign.objects.select_related(
+        'client', 'excel_report'
+    ).filter(approval_status='approved').order_by('-created_at')
+
+    data = []
+    for c in campaigns:
+        excel = getattr(c, 'excel_report', None)
+        data.append({
+            'campaign_id':    c.campaign_id,
+            'campaign_name':  c.campaign_name,
+            'client_name':    c.client.name if c.client else '',
+            'client_id':      c.client.client_id if c.client else '',
+            'start_date':     str(c.start_date)  if c.start_date  else '',
+            'end_date':       str(c.end_date)    if c.end_date    else '',
+            'line_items_count': c.line_items.count(),
+            'excel_generated': excel is not None,
+            'excel_url':      request.build_absolute_uri(excel.excel_file.url) if excel else None,
+            'generated_at':   excel.generated_at.isoformat() if excel else None,
+        })
+
+    return Response(data)
