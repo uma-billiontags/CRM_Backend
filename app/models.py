@@ -617,6 +617,8 @@ class Invoice(models.Model):
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='invoices')
     campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE, related_name='invoice')
     generated_at = models.DateTimeField(auto_now_add=True)
+    
+    pdf_file = models.FileField(upload_to='invoices/', null=True, blank=True)
 
     def generate_invoice_id(self):
         last = Invoice.objects.order_by('-id').first()

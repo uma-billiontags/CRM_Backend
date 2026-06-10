@@ -1821,137 +1821,6 @@ def update_creative_id(request):
         return Response({"error": str(e)}, status=500)
     
 
-
-from .models import InsertionOrder
-from .serializers import InsertionOrderSerializer
-
-# Save IO (called when user downloads/generates IO)
-@api_view(['POST'])
-@parser_classes([MultiPartParser, FormParser])
-def save_insertion_order(request):
-    campaign_id = request.data.get('campaign_id')
-    pdf_file = request.FILES.get('pdf_file')
-
-    if not campaign_id:
-        return Response({"error": "campaign_id is required"}, status=400)
-
-    try:
-        campaign = Campaign.objects.get(campaign_id=campaign_id)
-    except Campaign.DoesNotExist:
-        return Response({"error": "Campaign not found"}, status=404)
-
-    # If IO already exists for this campaign, update it
-    existing = InsertionOrder.objects.filter(campaign=campaign).first()
-    if existing:
-        if pdf_file:
-            existing.pdf_file = pdf_file
-            existing.save()
-        serializer = InsertionOrderSerializer(existing, context={'request': request})
-        return Response(serializer.data, status=200)
-
-    # Create new IO
-    io = InsertionOrder.objects.create(
-        client=campaign.client,
-        campaign=campaign,
-        pdf_file=pdf_file
-    )
-    serializer = InsertionOrderSerializer(io, context={'request': request})
-    return Response(serializer.data, status=201)
-
-
-# Get all IOs
-@api_view(['GET'])
-def get_all_insertion_orders(request):
-    ios = InsertionOrder.objects.select_related('client', 'campaign').order_by('-created_at')
-    serializer = InsertionOrderSerializer(ios, many=True, context={'request': request})
-    return Response(serializer.data)
-
-
-# Get IOs by client
-@api_view(['GET'])
-def get_insertion_orders_by_client(request, client_id):
-    ios = InsertionOrder.objects.filter(
-        client__client_id=client_id
-    ).select_related('client', 'campaign').order_by('-created_at')
-    serializer = InsertionOrderSerializer(ios, many=True, context={'request': request})
-    return Response(serializer.data)
-
-
-from .models import Invoice
-from .serializers import InvoiceSerializer
-from datetime import date
-
-# ==============================
-# GENERATE INVOICE
-# Called when campaign end date has passed
-# ==============================
-@api_view(['POST'])
-def generate_invoice(request):
-    campaign_id = request.data.get('campaign_id')
-
-    if not campaign_id:
-        return Response({"error": "campaign_id is required"}, status=400)
-
-    try:
-        campaign = Campaign.objects.get(campaign_id=campaign_id)
-    except Campaign.DoesNotExist:
-        return Response({"error": "Campaign not found"}, status=404)
-
-    # ── Check campaign is approved ──
-    if campaign.approval_status != 'approved':
-        return Response({"error": "Campaign is not approved yet"}, status=400)
-
-    # ── Check end date has passed ──
-    if not campaign.end_date:
-        return Response({"error": "Campaign has no end date"}, status=400)
-
-    if campaign.end_date > date.today():
-        return Response({
-            "error": "Invoice cannot be generated before campaign end date",
-            "end_date": str(campaign.end_date)
-        }, status=400)
-
-    # ── If invoice already exists, return it ──
-    existing = Invoice.objects.filter(campaign=campaign).first()
-    if existing:
-        serializer = InvoiceSerializer(existing, context={'request': request})
-        return Response(serializer.data, status=200)
-
-    # ── Create new invoice ──
-    invoice = Invoice.objects.create(
-        client=campaign.client,
-        campaign=campaign,
-    )
-    serializer = InvoiceSerializer(invoice, context={'request': request})
-    return Response(serializer.data, status=201)
-
-
-# ==============================
-# GET ALL INVOICES
-# ==============================
-@api_view(['GET'])
-def get_all_invoices(request):
-    invoices = Invoice.objects.select_related('client', 'campaign').order_by('-generated_at')
-    serializer = InvoiceSerializer(invoices, many=True, context={'request': request})
-    return Response(serializer.data)
-
-
-# ==============================
-# GET INVOICES BY CLIENT
-# Only returns invoices where campaign end date has passed
-# ==============================
-@api_view(['GET'])
-def get_invoices_by_client(request, client_id):
-    today = date.today()
-    invoices = Invoice.objects.filter(
-        client__client_id=client_id,
-        campaign__end_date__lte=today,           # end date passed
-        campaign__approval_status='approved',     # only approved
-    ).select_related('client', 'campaign').order_by('-generated_at')
-
-    serializer = InvoiceSerializer(invoices, many=True, context={'request': request})
-    return Response(serializer.data)
-
 # ==============================
 # ADD THESE TO YOUR views.py
 # ==============================
@@ -2181,3 +2050,229 @@ def get_campaigns_excel_list(request):
         })
 
     return Response(data)
+
+
+from weasyprint import HTML as WeasyHTML
+from django.core.files.base import ContentFile
+from .pdf_templates import build_io_html, build_invoice_html
+from .models import InsertionOrder
+from .models import Invoice
+
+# ── Generate IO PDF ──────────────────────────────────────────────────────────
+@api_view(['POST'])
+def generate_io_pdf(request, campaign_id):
+    try:
+        # CORRECT — use select_related for OneToOne
+        campaign = Campaign.objects.select_related(
+            'client', 'insertion_order'
+        ).prefetch_related(
+            'line_items__creatives_detail',
+            'line_items__third_party_creatives',
+        ).get(campaign_id=campaign_id)
+    except Campaign.DoesNotExist:
+        return Response({'error': 'Campaign not found'}, status=404)
+
+    # Get or create IO record
+    io_obj, _ = InsertionOrder.objects.get_or_create(
+        campaign=campaign,
+        defaults={'client': campaign.client}
+    )
+
+    # Fetch client details
+    try:
+        client = Client.objects.select_related(
+            'billing', 'ownership'
+        ).prefetch_related('contacts').get(pk=campaign.client.pk)
+    except Client.DoesNotExist:
+        client = None
+
+    # Build HTML and convert to PDF
+    html_string = build_io_html(campaign, client, io_obj.io_id)
+    pdf_bytes = WeasyHTML(string=html_string).write_pdf()
+
+    # Save PDF to model
+    filename = f"{io_obj.io_id}_{campaign_id}.pdf"
+    io_obj.pdf_file.save(filename, ContentFile(pdf_bytes), save=True)
+
+    url = request.build_absolute_uri(io_obj.pdf_file.url)
+    return Response({
+        'message': 'IO PDF generated successfully',
+        'io_id': io_obj.io_id,
+        'download_url': url,
+    }, status=200)
+
+
+# ── Generate Invoice PDF ─────────────────────────────────────────────────────
+@api_view(['POST'])
+def generate_invoice_pdf(request, campaign_id):
+    try:
+        campaign = Campaign.objects.select_related(
+            'client', 'invoice'
+        ).prefetch_related(
+            'line_items__creatives_detail',
+            'line_items__third_party_creatives',
+        ).get(campaign_id=campaign_id)
+    except Campaign.DoesNotExist:
+        return Response({'error': 'Campaign not found'}, status=404)
+
+    # ── Check approval ──
+    if campaign.approval_status != 'approved':
+        return Response({'error': 'Campaign is not approved'}, status=400)
+
+    # ── Check end date has passed ──
+    from datetime import date
+    if not campaign.end_date:
+        return Response({'error': 'Campaign has no end date'}, status=400)
+
+    if campaign.end_date > date.today():
+        return Response({
+            'error': 'Invoice cannot be generated before campaign end date',
+            'end_date': str(campaign.end_date)
+        }, status=400)
+
+    # ── Get or create invoice record ──
+    invoice_obj, _ = Invoice.objects.get_or_create(
+        campaign=campaign,
+        defaults={'client': campaign.client}
+    )
+
+    # ── Fetch client details ──
+    try:
+        client = Client.objects.select_related(
+            'billing', 'ownership'
+        ).prefetch_related('contacts').get(pk=campaign.client.pk)
+    except Client.DoesNotExist:
+        client = None
+
+    # ── Build HTML and convert to PDF ──
+    html_string = build_invoice_html(campaign, client)
+    pdf_bytes = WeasyHTML(string=html_string).write_pdf()
+
+    # ── Save PDF to model ──
+    filename = f"{invoice_obj.invoice_id}_{campaign_id}.pdf"
+    invoice_obj.pdf_file.save(filename, ContentFile(pdf_bytes), save=True)
+
+    url = request.build_absolute_uri(invoice_obj.pdf_file.url)
+    return Response({
+        'message': 'Invoice PDF generated successfully',
+        'invoice_id': invoice_obj.invoice_id,
+        'download_url': url,
+    }, status=200)
+
+# ── Download saved IO PDF ────────────────────────────────────────────────────
+@api_view(['GET'])
+def download_io_pdf(request, campaign_id):
+    try:
+        io_obj = InsertionOrder.objects.get(campaign__campaign_id=campaign_id)
+    except InsertionOrder.DoesNotExist:
+        return Response({'error': 'IO not found'}, status=404)
+
+    if not io_obj.pdf_file:
+        return Response({'error': 'PDF not generated yet'}, status=404)
+
+    response = FileResponse(
+        io_obj.pdf_file.open('rb'),
+        content_type='application/pdf'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{io_obj.io_id}.pdf"'
+    return response
+
+
+# ── Download saved Invoice PDF ───────────────────────────────────────────────
+@api_view(['GET'])
+def download_invoice_pdf(request, campaign_id):
+    try:
+        invoice_obj = Invoice.objects.get(campaign__campaign_id=campaign_id)
+    except Invoice.DoesNotExist:
+        return Response({'error': 'Invoice not found'}, status=404)
+
+    if not invoice_obj.pdf_file:
+        return Response({'error': 'PDF not generated yet'}, status=404)
+
+    response = FileResponse(
+        invoice_obj.pdf_file.open('rb'),
+        content_type='application/pdf'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{invoice_obj.invoice_id}.pdf"'
+    return response
+
+# ── ADD THIS to your views.py ──────────────────────────────────────────────────
+
+@api_view(['GET'])
+def get_io_list_by_client(request, client_id):
+    """
+    Returns all approved campaigns for a client with their IO/PDF status.
+    GET /get_io_list_by_client/<client_id>/
+    """
+    campaigns = Campaign.objects.select_related(
+        'client', 'insertion_order'
+    ).filter(
+        client__client_id=client_id,
+        approval_status='approved'
+    ).prefetch_related('line_items').order_by('-created_at')
+
+    data = []
+    for c in campaigns:
+        io = getattr(c, 'insertion_order', None)
+        data.append({
+            'campaign_id':      c.campaign_id,
+            'campaign_name':    c.campaign_name,
+            'advertiser':       c.advertiser or '',
+            'client_name':      c.client.name if c.client else '',
+            'client_id':        c.client.client_id if c.client else '',
+            'start_date':       str(c.start_date) if c.start_date else '',
+            'end_date':         str(c.end_date) if c.end_date else '',
+            'campaign_type':    c.campaign_type or '',
+            'line_items_count': c.line_items.count(),
+            'io_id':            io.io_id if io else None,
+            # pdf_generated = IO exists AND has a pdf_file saved
+            'pdf_generated':    bool(io and io.pdf_file),
+            'pdf_url':          request.build_absolute_uri(io.pdf_file.url) if io and io.pdf_file else None,
+            'created_at':       c.created_at.isoformat() if c.created_at else '',
+        })
+
+    return Response(data)
+
+
+
+# ── ADD THIS to your views.py ──────────────────────────────────────────────────
+
+@api_view(['GET'])
+def get_invoice_list_by_client(request, client_id):
+    """
+    Returns all approved campaigns for a client where end_date has passed,
+    with their Invoice/PDF status.
+    GET /get_invoice_list_by_client/<client_id>/
+    """
+    from datetime import date as date_today
+
+    campaigns = Campaign.objects.select_related(
+        'client', 'invoice'
+    ).filter(
+        client__client_id=client_id,
+        approval_status='approved',
+        end_date__lte=date_today.today(),   # only campaigns whose end date has passed
+    ).prefetch_related('line_items').order_by('-created_at')
+
+    data = []
+    for c in campaigns:
+        inv = getattr(c, 'invoice', None)
+        data.append({
+            'campaign_id':      c.campaign_id,
+            'campaign_name':    c.campaign_name,
+            'advertiser':       c.advertiser or '',
+            'client_name':      c.client.name if c.client else '',
+            'client_id':        c.client.client_id if c.client else '',
+            'start_date':       str(c.start_date) if c.start_date else '',
+            'end_date':         str(c.end_date) if c.end_date else '',
+            'campaign_type':    c.campaign_type or '',
+            'line_items_count': c.line_items.count(),
+            'invoice_id':       inv.invoice_id if inv else None,
+            # pdf_generated = Invoice exists AND has a pdf_file saved
+            'pdf_generated':    bool(inv and inv.pdf_file),
+            'pdf_url':          request.build_absolute_uri(inv.pdf_file.url) if inv and inv.pdf_file else None,
+            'created_at':       c.created_at.isoformat() if c.created_at else '',
+        })
+
+    return Response(data)
+
