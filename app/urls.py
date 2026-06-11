@@ -53,6 +53,10 @@ urlpatterns = [
     
     path('get_io_list_by_client/<str:client_id>/', views.get_io_list_by_client),
     path('get_invoice_list_by_client/<str:client_id>/', views.get_invoice_list_by_client),
+    
+    path('save_campaign_excel_edits/<str:campaign_id>/', views.save_campaign_excel_edits),
+    
+    path('save_excel_edits_to_db/<str:campaign_id>/', views.save_excel_edits_to_db),
 
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

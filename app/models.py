@@ -362,9 +362,7 @@ class LineItem(models.Model):
     geo_targeting = models.TextField(blank=True, null=True)
     platforms = models.CharField(max_length=300, blank=True, null=True)
     frequency_cap = models.PositiveIntegerField(blank=True, null=True)
-    brand_safety = models.CharField(max_length=20, blank=True, null=True)
-    viewability_goal = models.PositiveIntegerField(blank=True, null=True)
-   
+    brand_safety = models.CharField(max_length=20, blank=True, null=True)   
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -641,15 +639,22 @@ class Invoice(models.Model):
         return f"{self.invoice_id} → {self.campaign.campaign_id}"
     
 
+
 class CampaignExcel(models.Model):
-    campaign = models.OneToOneField(
-        Campaign,
-        on_delete=models.CASCADE,
-        related_name='excel_report'
+    REPORT_TYPE_CHOICES = [
+        ('cpm', 'CPM (Impressions Booked)'),
+        ('cpc', 'CPC (Clicks Booked)'),
+    ]
+    campaign = models.ForeignKey(  # Change OneToOne → ForeignKey
+        Campaign, on_delete=models.CASCADE, related_name='excel_reports'
     )
+    report_type = models.CharField(max_length=10, choices=REPORT_TYPE_CHOICES, default='cpm')
     excel_file = models.FileField(upload_to='excel_reports/')
     generated_at = models.DateTimeField(auto_now=True)
- 
-    def __str__(self):
-        return f"Excel - {self.campaign.campaign_id}"
- 
+    
+     # ✅ Store per-line-item overrides as JSON
+    # Format: { "LIBILL003": { "impressions": 50000, "start_date": "2026-06-01", ... } }
+    line_item_overrides = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        unique_together = ('campaign', 'report_type')  # one CPM + one CPC per campaign
