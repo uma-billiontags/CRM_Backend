@@ -43,7 +43,16 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'app', 
+    
+    'accounts',
+    'clients',
+    'campaigns',
+    'chat',
+    'notifications',
+    'reports',
+    'insertion_order',
+    'invoices',
+    
     'rest_framework',
     'corsheaders',
     'channels',   # enabled websocket support     
@@ -87,7 +96,7 @@ WSGI_APPLICATION = 'CRM_Backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'crm_database.sqlite3',
+        'NAME': BASE_DIR / 'crm_database2.sqlite3',
     }
 }
 
@@ -162,7 +171,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = False
 
-AUTH_USER_MODEL = 'app.User'
+AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ALLOW_HEADERS = [
     'accept',
