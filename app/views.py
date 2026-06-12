@@ -1907,8 +1907,8 @@ def build_campaign_excel(campaign, report_type='cpm', overrides=None) -> bytes:
             ('Clicks Booked' if is_cpc else 'Impressions Booked', impressions or ''),
             ('Start Date',          start_date),
             ('End Date',            end_date),
-            ('Target CPC' if is_cpc else 'Target CPM', units),
-            ('Target CTR' if is_cpc else 'Booked Budget', ctr_display),
+            ('Booked Budget' if is_cpc else 'Target CTR', ctr_display),
+            ('Target CTR' if is_cpc else ctr_display, 'Booked Budget'),
             ('Line Item ID',        li.line_item_id or ''),
             ('Line Item Name',      li.line_item_name or ''),
             ('Ethnicity',           li.ethnicity or ''),
@@ -2039,6 +2039,7 @@ def get_campaigns_excel_list(request):
                 'excel_generated':  excel is not None,
                 'excel_url':        request.build_absolute_uri(excel.excel_file.url) if excel else None,
                 'generated_at':     excel.generated_at.isoformat() if excel else None,
+                'publish_status':   excel.publish_status if excel else None,
             })
 
     return Response(data)
@@ -2082,24 +2083,6 @@ def download_campaign_excel(request, campaign_id):
 
 @api_view(['POST'])
 def save_excel_edits_to_db(request, campaign_id):
-    """
-    Save edited Excel cell values to CampaignExcel.line_item_overrides
-    and also update LineItem table for the relevant fields.
-    POST /save_excel_edits_to_db/<campaign_id>/
-    Body: {
-        report_type: 'cpm',
-        line_item_id: 'LIBILL003',
-        impressions: 50000,
-        start_date: '2026-06-01',
-        end_date: '2026-06-07',
-        units: 'CPM',
-        ctr: '0.4',
-        viewability: '70',
-        vcr: '70',
-        kpi_notes: 'some note',
-        sitelist: 'some sitelist'
-    }
-    """
     try:
         report_type  = request.data.get('report_type', 'cpm')
         line_item_id = request.data.get('line_item_id')
@@ -2116,90 +2099,149 @@ def save_excel_edits_to_db(request, campaign_id):
         except CampaignExcel.DoesNotExist:
             return Response({'error': 'Excel record not found. Generate first.'}, status=404)
 
-        # ── 2. Build override dict for this line item ─────────────────────
-        editable_fields = ['impressions', 'start_date', 'end_date', 'units', 'ctr', 'viewability', 'vcr', 'kpi_notes', 'sitelist']
+        # ── 2. Get LineItem ───────────────────────────────────────────────
+        try:
+            line_item = LineItem.objects.get(line_item_id=line_item_id)
+        except LineItem.DoesNotExist:
+            return Response({'error': 'LineItem not found'}, status=404)
 
+        # ── 3. Get Campaign ───────────────────────────────────────────────
+        try:
+            campaign = Campaign.objects.select_related(
+                'client', 'insertion_order'
+            ).prefetch_related(
+                'line_items',
+                'line_items__creatives_detail',
+                'line_items__third_party_creatives',
+            ).get(campaign_id=campaign_id)
+        except Campaign.DoesNotExist:
+            return Response({'error': 'Campaign not found'}, status=404)
+
+        editable_fields = [
+            'impressions', 'start_date', 'end_date', 'units',
+            'ctr', 'viewability', 'vcr', 'kpi_notes', 'sitelist'
+        ]
+
+        # ── 4. Build override dict ────────────────────────────────────────
         li_override = excel_obj.line_item_overrides.get(line_item_id, {})
-
         for field in editable_fields:
             if field in request.data and request.data[field] is not None:
                 li_override[field] = request.data[field]
 
-        # ── 3. Save overrides to CampaignExcel ───────────────────────────
+        # ── 5. Save overrides to CampaignExcel.line_item_overrides ────────
         overrides = excel_obj.line_item_overrides.copy()
         overrides[line_item_id] = li_override
         excel_obj.line_item_overrides = overrides
         excel_obj.save(update_fields=['line_item_overrides'])
 
-        # ── 4. Also update LineItem table (except sitelist) ───────────────
-        try:
-            line_item = LineItem.objects.get(line_item_id=line_item_id)
+        # ── 6. Update LineItem table (except sitelist) ────────────────────
+        if 'impressions' in li_override:
+            try:
+                line_item.impressions = int(
+                    str(li_override['impressions']).replace(',', '').strip()
+                )
+            except (ValueError, TypeError):
+                pass
 
-            if 'impressions' in li_override:
-                try:
-                    line_item.impressions = int(str(li_override['impressions']).replace(',', '').strip())
-                except (ValueError, TypeError):
-                    pass
+        if 'start_date' in li_override and li_override['start_date']:
+            line_item.start_date = parse_date(str(li_override['start_date']))
 
-            if 'start_date' in li_override and li_override['start_date']:
-                line_item.start_date = parse_date(str(li_override['start_date']))
+        if 'end_date' in li_override and li_override['end_date']:
+            line_item.end_date = parse_date(str(li_override['end_date']))
 
-            if 'end_date' in li_override and li_override['end_date']:
-                line_item.end_date = parse_date(str(li_override['end_date']))
+        if 'units' in li_override and li_override['units']:
+            line_item.units = str(li_override['units']).strip()
 
-            if 'units' in li_override and li_override['units']:
-                line_item.units = str(li_override['units']).strip()
+        if 'ctr' in li_override:
+            try:
+                line_item.ctr = float(
+                    str(li_override['ctr']).replace('%', '').strip()
+                )
+            except (ValueError, TypeError):
+                pass
 
-            if 'ctr' in li_override:
-                try:
-                    line_item.ctr = float(str(li_override['ctr']).replace('%', '').strip())
-                except (ValueError, TypeError):
-                    pass
+        if 'viewability' in li_override:
+            try:
+                line_item.viewability = float(
+                    str(li_override['viewability']).replace('%', '').strip()
+                )
+            except (ValueError, TypeError):
+                pass
 
-            if 'viewability' in li_override:
-                try:
-                    line_item.viewability = float(str(li_override['viewability']).replace('%', '').strip())
-                except (ValueError, TypeError):
-                    pass
+        if 'vcr' in li_override:
+            try:
+                line_item.vcr = float(
+                    str(li_override['vcr']).replace('%', '').strip()
+                )
+            except (ValueError, TypeError):
+                pass
 
-            if 'vcr' in li_override:
-                try:
-                    line_item.vcr = float(str(li_override['vcr']).replace('%', '').strip())
-                except (ValueError, TypeError):
-                    pass
+        if 'kpi_notes' in li_override:
+            line_item.kpi_notes = str(li_override['kpi_notes'])
 
-            if 'kpi_notes' in li_override:
-                line_item.kpi_notes = str(li_override['kpi_notes'])
+        line_item.save()
 
-            line_item.save()
+        # ── 7. Save to CampaignLineItemExcel table ────────────────────────
+        from .models import CampaignLineItemExcel
 
-        except LineItem.DoesNotExist:
-            pass  # override stored, LineItem update skipped
+        excel_li_obj, _ = CampaignLineItemExcel.objects.update_or_create(
+            line_item=line_item,
+            report_type=report_type,
+            defaults={
+                'campaign': campaign,
+                'impressions': line_item.impressions,
+                'start_date': line_item.start_date,
+                'end_date': line_item.end_date,
+                'units': line_item.units,
+                'ctr': line_item.ctr,
+                'viewability': line_item.viewability,
+                'vcr': line_item.vcr,
+                'kpi_notes': line_item.kpi_notes,
+                'sitelist': li_override.get('sitelist', ''),
+            }
+        )
 
-        # ── 5. Re-generate Excel with updated overrides ───────────────────
-        campaign = Campaign.objects.select_related(
-            'client', 'insertion_order'
-        ).prefetch_related(
-            'line_items',
-            'line_items__creatives_detail',
-            'line_items__third_party_creatives',
-        ).get(campaign_id=campaign_id)
-
+        # ── 8. Re-generate Excel with updated overrides ───────────────────
         excel_bytes = build_campaign_excel(campaign, report_type, overrides=overrides)
         filename = f"{campaign_id}_{report_type}.xlsx"
         excel_obj.excel_file.save(filename, ContentFile(excel_bytes), save=True)
 
         url = request.build_absolute_uri(excel_obj.excel_file.url)
         return Response({
-            'message': 'Saved to DB and Excel regenerated',
+            'message': 'Saved to LineItem, CampaignLineItemExcel & Excel regenerated',
             'download_url': url,
             'line_item_overrides': overrides,
+            'excel_line_item_id': excel_li_obj.id,
         }, status=200)
 
     except Exception as e:
         import traceback
         print(traceback.format_exc())
         return Response({'error': str(e)}, status=500)
+
+
+@api_view(['POST'])
+def publish_campaign_excel(request, campaign_id):
+    report_type = request.data.get('report_type', 'cpm')
+    try:
+        excel_obj = CampaignExcel.objects.get(
+            campaign__campaign_id=campaign_id,
+            report_type=report_type
+        )
+    except CampaignExcel.DoesNotExist:
+        return Response({'error': 'Excel not found. Generate first.'}, status=404)
+
+    excel_obj.publish_status = 'published'
+    excel_obj.save(update_fields=['publish_status'])
+
+    return Response({
+        'message': 'Excel published successfully',
+        'campaign_id': campaign_id,
+        'report_type': report_type,
+        'publish_status': excel_obj.publish_status,
+    }, status=200)
+    
+    
 
 
 from weasyprint import HTML as WeasyHTML
