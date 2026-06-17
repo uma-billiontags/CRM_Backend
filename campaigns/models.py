@@ -107,6 +107,8 @@ class LineItem(models.Model):
     frequency_cap = models.PositiveIntegerField(blank=True, null=True)
     brand_safety = models.CharField(max_length=20, blank=True, null=True)   
 
+    dv_id = models.CharField(max_length=100, blank=True, null=True, unique=True)  # ← ADD THIS
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

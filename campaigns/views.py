@@ -655,3 +655,24 @@ def update_creative_id(request):
         return Response({"error": "Creative not found"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+@api_view(["PATCH"])
+def update_line_item_dv_id(request, line_item_id):
+    """
+    PATCH /update_line_item_dv_id/<line_item_id>/
+    Body: { "dv_id": "DV360_12345" }
+    """
+    try:
+        line_item = LineItem.objects.get(line_item_id=line_item_id)
+    except LineItem.DoesNotExist:
+        return Response({"error": "LineItem not found"}, status=404)
+
+    dv_id = request.data.get("dv_id", "").strip()
+    line_item.dv_id = dv_id
+    line_item.save(update_fields=["dv_id"])
+
+    return Response({
+        "message": "DV ID updated successfully",
+        "line_item_id": line_item_id,
+        "dv_id": line_item.dv_id,
+    }, status=200)

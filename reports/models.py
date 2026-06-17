@@ -80,3 +80,48 @@ class CampaignLineItemExcelDetails(models.Model):
 
     def __str__(self):
         return f"ExcelData — {self.line_item.line_item_id} ({self.report_type})"
+
+
+class CampaignDailyEntry(models.Model):
+    """One row per (line_item, date). Used to lock the date in the frontend
+    once submitted, and as the source of truth for the daily-report Excel sheet."""
+    campaign = models.ForeignKey(
+        Campaign, on_delete=models.CASCADE, related_name="daily_entries"
+    )
+    line_item = models.ForeignKey(
+        LineItem, on_delete=models.CASCADE, related_name="daily_entries"
+    )
+    entry_date = models.DateField()
+    impressions = models.BigIntegerField(default=0)
+    clicks = models.BigIntegerField(default=0)
+    ctr = models.FloatField(default=0)
+    viewable_impression = models.BigIntegerField(default=0)
+    measurable_impression = models.BigIntegerField(default=0)
+    video_start = models.BigIntegerField(default=0)
+    video_end = models.BigIntegerField(default=0)
+    revenue=models.FloatField(default=0)
+    media_cost=models.FloatField(default=0)
+    
+     # ✅ NEW — only meaningful for video line items, default 0 for non-video
+    vcr = models.FloatField(default=0)          # Video Completion Rate (%)
+    viewability = models.FloatField(default=0)  # Viewability (%)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("line_item", "entry_date")
+        ordering = ["entry_date"]
+
+    def __str__(self):
+        return f"{self.line_item.line_item_id} — {self.entry_date} — {self.impressions} imp"
+
+
+class CampaignDailyReportExcel(models.Model):
+    campaign = models.OneToOneField(
+        Campaign, on_delete=models.CASCADE, related_name="daily_report_excel"
+    )
+    excel_file = models.FileField(upload_to="daily_report_excels/")
+    generated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"DailyReportExcel — {self.campaign.campaign_id}"

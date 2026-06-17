@@ -15,6 +15,8 @@ urlpatterns = [
     # Creative
     path('update_creative_id/', views.update_creative_id, name='update_creative_id'),
     
+    path('update_line_item_dv_id/<str:line_item_id>/', views.update_line_item_dv_id, name='update_line_item_dv_id'),
+    
 ] 
 
 
