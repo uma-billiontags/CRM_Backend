@@ -1,5 +1,5 @@
-from .models import ChatRoom, Message, GeneralChatRoom, GeneralMessage, InternalChatRoom, InternalMessage
-from .serializers import MessageSerializer, GeneralMessageSerializer, InternalMessageSerializer
+from .models import ChatRoom, Message, GeneralChatRoom, GeneralMessage, InternalChatRoom, InternalMessage, CampaignTeamChatRoom, CampaignTeamMessage
+from .serializers import MessageSerializer, GeneralMessageSerializer, InternalMessageSerializer, CampaignTeamMessageSerializer
 from rest_framework.response import Response 
 from rest_framework.decorators import api_view, parser_classes
 from accounts.models import User
@@ -516,6 +516,155 @@ def send_internal_chat_file(request, user_id):
         )
 
         return Response({"message": "File sent successfully", "file_url": file_url, "message_type": message_type}, status=201)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+    
+@api_view(['GET'])
+def get_campaign_team_chat_history(request, campaign_id, team_type):
+    try:
+        try:
+            room = CampaignTeamChatRoom.objects.get(
+                campaign__campaign_id=campaign_id, team_type=team_type
+            )
+        except CampaignTeamChatRoom.DoesNotExist:
+            return Response([], status=200)
+
+        messages = CampaignTeamMessage.objects.filter(room=room).order_by('timestamp')
+        serializer = CampaignTeamMessageSerializer(messages, many=True, context={'request': request})
+        return Response(serializer.data, status=200)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(['POST'])
+def mark_campaign_team_messages_read(request, campaign_id, team_type):
+    try:
+        room = CampaignTeamChatRoom.objects.get(
+            campaign__campaign_id=campaign_id, team_type=team_type
+        )
+        reader_type = request.data.get('reader_type', 'admin')
+        sender_to_clear = 'member' if reader_type == 'admin' else 'admin'
+
+        CampaignTeamMessage.objects.filter(
+            room=room, is_read=False, sender_type=sender_to_clear
+        ).update(is_read=True)
+
+        return Response({"message": "Marked as read"}, status=200)
+
+    except CampaignTeamChatRoom.DoesNotExist:
+        return Response({"error": "Room not found"}, status=404)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+# Admin sidebar list — all campaigns that have a thread for this team_type
+@api_view(['GET'])
+def get_all_campaign_team_chat_rooms(request, team_type):
+    try:
+        rooms = CampaignTeamChatRoom.objects.filter(
+            team_type=team_type
+        ).select_related('campaign').order_by('-created_at')
+
+        data = []
+        for room in rooms:
+            last_message = CampaignTeamMessage.objects.filter(room=room).order_by('-timestamp').first()
+            unread_count = CampaignTeamMessage.objects.filter(
+                room=room, is_read=False, sender_type='member'
+            ).count()
+
+            data.append({
+                "room_id":       room.id,
+                "campaign_id":   room.campaign.campaign_id,
+                "campaign_name": room.campaign.campaign_name,
+                "last_message":  last_message.content if last_message else None,
+                "last_time":     last_message.timestamp.isoformat() if last_message else None,
+                "unread_count":  unread_count,
+            })
+
+        return Response(data, status=200)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+def _resolve_campaign_team_sender_name(sender_id, sender_type):
+    for Model in (TeamAccess, User):
+        try:
+            obj = Model.objects.get(id=sender_id)
+            return obj.member if Model is TeamAccess else obj.username
+        except Model.DoesNotExist:
+            continue
+    return None
+
+
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def send_campaign_team_chat_file(request, campaign_id, team_type):
+    try:
+        file        = request.FILES.get('file')
+        sender_id   = request.data.get('sender_id')
+        sender_type = request.data.get('sender_type')
+        content     = request.data.get('content', '')
+
+        if not file or not sender_id:
+            return Response({"error": "file and sender_id required"}, status=400)
+
+        try:
+            room = CampaignTeamChatRoom.objects.get(
+                campaign__campaign_id=campaign_id, team_type=team_type
+            )
+        except CampaignTeamChatRoom.DoesNotExist:
+            campaign = Campaign.objects.get(campaign_id=campaign_id)
+            room = CampaignTeamChatRoom.objects.create(campaign=campaign, team_type=team_type)
+
+        file_type = file.content_type
+        if file_type.startswith('image/'):
+            message_type = 'image'
+        elif file_type.startswith('video/'):
+            message_type = 'video'
+        else:
+            message_type = 'file'
+
+        size = file.size
+        file_size = f"{size // 1024} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
+
+        sender_name = _resolve_campaign_team_sender_name(sender_id, sender_type)
+        if sender_name is None:
+            return Response({"error": "Sender not found"}, status=400)
+
+        message = CampaignTeamMessage.objects.create(
+            room=room, sender_id=sender_id, sender_name=sender_name, sender_type=sender_type,
+            content=content, message_type=message_type, file=file,
+            file_name=file.name, file_size=file_size,
+        )
+
+        channel_layer = get_channel_layer()
+        room_group    = f"campaign_team_chat_{campaign_id}_{team_type}"
+        file_url      = request.build_absolute_uri(message.file.url)
+
+        async_to_sync(channel_layer.group_send)(
+            room_group,
+            {
+                'type':         'chat_message',
+                'message_id':   message.id,
+                'content':      content,
+                'sender_id':    sender_id,
+                'sender_type':  sender_type,
+                'message_type': message_type,
+                'file_url':     file_url,
+                'file_name':    file.name,
+                'file_size':    file_size,
+                'timestamp':    message.timestamp.isoformat(),
+            }
+        )
+
+        return Response({
+            "message": "File sent successfully",
+            "file_url": file_url,
+            "message_type": message_type,
+        }, status=201)
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)

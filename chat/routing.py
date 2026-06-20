@@ -6,6 +6,7 @@ from django.urls import re_path             # It handle websocket request (ws://
 from .consumer import ChatConsumer          
 from .general_consumer import GeneralChatConsumer
 from .internal_consumer import InternalChatConsumer
+from .campaign_team_consumer import CampaignTeamChatConsumer  # add to imports
 
 websocket_urlpatterns = [
     re_path(
@@ -22,5 +23,10 @@ websocket_urlpatterns = [
     re_path(
         r'ws/internal-chat/(?P<user_id>[^/]+)/$',
         InternalChatConsumer.as_asgi()
+    ),
+    
+    re_path(
+        r'ws/campaign-team-chat/(?P<campaign_id>[^/]+)/(?P<team_type>[^/]+)/$',
+        CampaignTeamChatConsumer.as_asgi()
     ),
 ]

@@ -191,3 +191,69 @@ class InternalMessage(models.Model):
 
     def __str__(self):
         return f"{self.sender_type} → {self.room} → {self.timestamp:%Y-%m-%d %H:%M}"
+    
+    
+# ==============================
+# CAMPAIGN TEAM CHAT (Team ↔ Admin, scoped to a specific campaign)
+# ==============================
+
+class CampaignTeamChatRoom(models.Model):
+
+    TEAM_TYPE = [
+        ("creative", "Creative Team"),
+        ("campaign_team", "Campaign Team"),
+    ]
+
+    campaign = models.ForeignKey(
+        Campaign, on_delete=models.CASCADE, related_name="team_chat_rooms"
+    )
+
+    team_type = models.CharField(max_length=20, choices=TEAM_TYPE)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("campaign", "team_type")  # one room per (campaign, team) pair
+
+    def __str__(self):
+        return f"{self.get_team_type_display()} Room → {self.campaign.campaign_id}"
+
+
+class CampaignTeamMessage(models.Model):
+
+    SENDER_TYPE = [
+        ("member", "Team Member"),
+        ("admin", "Admin"),
+    ]
+
+    MESSAGE_TYPE = [
+        ("text", "Text"),
+        ("image", "Image"),
+        ("video", "Video"),
+        ("file", "File"),
+    ]
+
+    room = models.ForeignKey(
+        CampaignTeamChatRoom, on_delete=models.CASCADE, related_name="messages"
+    )
+
+    # sender_id is TeamAccess.id when sender_type='member', accounts.User.id when 'admin'
+    sender_id = models.IntegerField()
+    sender_name = models.CharField(max_length=150, blank=True)  # denormalized, set at creation
+
+    sender_type = models.CharField(max_length=10, choices=SENDER_TYPE)
+    content = models.TextField(blank=True)
+
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPE, default="text")
+    file = models.FileField(upload_to="campaign_team_chat/files/", null=True, blank=True)
+    file_name = models.CharField(max_length=255, blank=True)
+    file_size = models.CharField(max_length=50, blank=True)
+
+    timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["timestamp"]
+
+    def __str__(self):
+        return f"{self.sender_type} → {self.room} → {self.timestamp:%Y-%m-%d %H:%M}"

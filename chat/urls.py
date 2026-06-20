@@ -18,6 +18,11 @@ urlpatterns = [
     path('mark_internal_messages_read/<str:user_id>/', views.mark_internal_messages_read, name='mark_internal_messages_read'),
     path('get_all_internal_chat_rooms/', views.get_all_internal_chat_rooms, name='get_all_internal_chat_rooms'),
     path('send_internal_chat_file/<str:user_id>/', views.send_internal_chat_file, name='send_internal_chat_file'),
+    
+    path('get_campaign_team_chat_history/<str:campaign_id>/<str:team_type>/', views.get_campaign_team_chat_history, name='get_campaign_team_chat_history'),
+    path('mark_campaign_team_messages_read/<str:campaign_id>/<str:team_type>/', views.mark_campaign_team_messages_read, name='mark_campaign_team_messages_read'),
+    path('get_all_campaign_team_chat_rooms/<str:team_type>/', views.get_all_campaign_team_chat_rooms, name='get_all_campaign_team_chat_rooms'),
+    path('send_campaign_team_chat_file/<str:campaign_id>/<str:team_type>/', views.send_campaign_team_chat_file, name='send_campaign_team_chat_file'),
 ]
 
 # runserver: daphne CRM_Backend.asgi:application

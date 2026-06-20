@@ -74,3 +74,21 @@ class InternalMessageSerializer(serializers.ModelSerializer):
         if obj.file and request:
             return request.build_absolute_uri(obj.file.url)
         return None
+    
+class CampaignTeamMessageSerializer(serializers.ModelSerializer):
+
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CampaignTeamMessage
+        fields = [
+            'id', 'content', 'sender_id', 'sender_name', 'sender_type',
+            'message_type', 'file', 'file_url', 'file_name', 'file_size',
+            'timestamp', 'is_read',
+        ]
+
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return None
