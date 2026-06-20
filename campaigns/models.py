@@ -188,3 +188,57 @@ class ThirdPartyCreative(models.Model):
     def __str__(self):
         return f"ThirdPartyCreative ({self.line_item.line_item_name})"
 
+
+class BulkCampaignDetails(models.Model):
+    client = models.ForeignKey(
+        Client, on_delete=models.CASCADE,
+        related_name="bulk_campaign_requests", null=True, blank=True
+    )
+    client_name = models.CharField(max_length=200, blank=True, null=True)
+
+    advertiser = models.CharField(max_length=200)
+    website_url = models.URLField(blank=True, null=True)
+
+    client_campaign_id = models.CharField(max_length=100, blank=True, null=True)
+    purchase_order_id = models.CharField(max_length=100, blank=True, null=True)
+
+    campaign_name = models.CharField(max_length=300)
+    campaign_type = models.CharField(max_length=50)
+    buying_type = models.CharField(max_length=200, blank=True, null=True)
+    objective = models.CharField(max_length=100)
+
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+
+    # The full line-item paragraph the user typed
+    message = models.TextField(blank=True, null=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=[('pending', 'Pending'), ('processed', 'Processed')],
+        default='pending'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"BulkCampaignRequest: {self.campaign_name} ({self.client_name})"
+
+
+class BulkCampaignAttachment(models.Model):
+    bulk_campaign = models.ForeignKey(
+        BulkCampaignDetails, on_delete=models.CASCADE, related_name='attachments'
+    )
+    file = models.FileField(upload_to='bulk_campaign_attachments/')
+    file_name = models.CharField(max_length=255, blank=True)
+    file_type = models.CharField(max_length=100, blank=True)  # e.g. image/jpeg, video/mp4
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"Attachment ({self.file_name}) for {self.bulk_campaign.campaign_name}"

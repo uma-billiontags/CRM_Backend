@@ -17,6 +17,11 @@ urlpatterns = [
     
     path('update_line_item_dv_id/<str:line_item_id>/', views.update_line_item_dv_id, name='update_line_item_dv_id'),
     
+    path('create_bulk_campaign/', views.create_bulk_campaign, name='create_bulk_campaign'),
+    
+    path('get_bulk_campaigns/', views.get_bulk_campaigns, name='get_bulk_campaigns'),
+    path('update_bulk_campaign_status/<int:pk>/', views.update_bulk_campaign_status, name='update_bulk_campaign_status'),
+    
 ] 
 
 

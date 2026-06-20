@@ -4,8 +4,8 @@
 
 # Claude
 
-from channels.generic.websocket import AsyncWebsocketConsumer
-from channels.db import database_sync_to_async
+from channels.generic.websocket import AsyncWebsocketConsumer # AsyncWebsocketConsumer is a Django Channels class used to handle WebSocket connections.
+from channels.db import database_sync_to_async # It is a decorator that allows Django ORM queries inside async functions.
 from .models import ChatRoom, Message
 from campaigns.models import Campaign
 from accounts.models import User

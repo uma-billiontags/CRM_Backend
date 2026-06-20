@@ -1,3 +1,4 @@
+# asgi.py is essentially the switchboard — it's the one file that decides "is this an HTTP request or a WebSocket request
 import os
 import django
 

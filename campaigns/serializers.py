@@ -137,3 +137,34 @@ class CampaignSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ['campaign_id', 'created_at']  # ← add created_at too
 
+
+from rest_framework import serializers
+from .models import BulkCampaignDetails, BulkCampaignAttachment
+
+
+class BulkCampaignAttachmentSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BulkCampaignAttachment
+        fields = ['id', 'file_url', 'file_name', 'file_type', 'uploaded_at']
+
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and hasattr(obj.file, 'url'):
+            return request.build_absolute_uri(obj.file.url) if request else obj.file.url
+        return None
+
+
+class BulkCampaignDetailsSerializer(serializers.ModelSerializer):
+    attachments = BulkCampaignAttachmentSerializer(many=True, read_only=True)
+    client_id = serializers.CharField(source='client.client_id', read_only=True, default=None)
+
+    class Meta:
+        model = BulkCampaignDetails
+        fields = [
+            'id', 'client', 'client_id', 'client_name', 'advertiser', 'website_url',
+            'client_campaign_id', 'purchase_order_id', 'campaign_name', 'campaign_type',
+            'buying_type', 'objective', 'start_date', 'end_date', 'message',
+            'status', 'created_at', 'attachments',
+        ]

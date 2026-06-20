@@ -676,3 +676,99 @@ def update_line_item_dv_id(request, line_item_id):
         "line_item_id": line_item_id,
         "dv_id": line_item.dv_id,
     }, status=200)
+    
+
+from .models import BulkCampaignDetails, BulkCampaignAttachment
+
+
+@api_view(["POST"])
+@parser_classes([MultiPartParser, FormParser])
+def create_bulk_campaign(request):
+
+    client_id = request.data.get("client")
+    client_name = request.data.get("client_name", "")
+
+    # Client lookup is best-effort — still save the request even if not found
+    client = None
+    if client_id:
+        try:
+            client = Client.objects.get(client_id=client_id)
+        except Client.DoesNotExist:
+            client = None
+
+    advertiser = request.data.get("advertiser")
+    campaign_name = request.data.get("campaign_name")
+    campaign_type = request.data.get("campaign_type")
+    objective = request.data.get("objective")
+
+    if not advertiser or not campaign_name or not campaign_type or not objective:
+        return Response(
+            {"error": "advertiser, campaign_name, campaign_type and objective are required"},
+            status=400,
+        )
+
+    try:
+        with transaction.atomic():
+            bulk_campaign = BulkCampaignDetails.objects.create(
+                client=client,
+                client_name=client_name,
+                advertiser=advertiser,
+                website_url=request.data.get("website_url") or None,
+                client_campaign_id=request.data.get("client_campaign_id") or None,
+                purchase_order_id=request.data.get("purchase_order_id") or None,
+                campaign_name=campaign_name,
+                campaign_type=campaign_type,
+                buying_type=request.data.get("buying_type", ""),
+                objective=objective,
+                start_date=parse_date(request.data.get("start_date")),
+                end_date=parse_date(request.data.get("end_date")),
+                message=request.data.get("message", ""),
+            )
+
+            attachment_count = int(request.data.get("attachment_count") or 0)
+            for i in range(attachment_count):
+                file_obj = request.FILES.get(f"attachment_{i}")
+                if not file_obj:
+                    continue
+                BulkCampaignAttachment.objects.create(
+                    bulk_campaign=bulk_campaign,
+                    file=file_obj,
+                    file_name=file_obj.name,
+                    file_type=file_obj.content_type or "",
+                )
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+    return Response(
+        {
+            "message": "Bulk campaign request submitted successfully",
+            "id": bulk_campaign.id,
+        },
+        status=201,
+    )
+    
+
+from .serializers import BulkCampaignDetailsSerializer
+
+@api_view(["GET"])
+def get_bulk_campaigns(request):
+    bulk_campaigns = BulkCampaignDetails.objects.select_related("client").prefetch_related("attachments")
+    serializer = BulkCampaignDetailsSerializer(bulk_campaigns, many=True, context={"request": request})
+    return Response(serializer.data)
+
+
+@api_view(["PATCH"])
+def update_bulk_campaign_status(request, pk):
+    try:
+        bulk_campaign = BulkCampaignDetails.objects.get(pk=pk)
+    except BulkCampaignDetails.DoesNotExist:
+        return Response({"error": "Bulk campaign request not found"}, status=404)
+
+    status_val = request.data.get("status")
+    if status_val not in ("pending", "processed"):
+        return Response({"error": "status must be 'pending' or 'processed'"}, status=400)
+
+    bulk_campaign.status = status_val
+    bulk_campaign.save(update_fields=["status"])
+    return Response({"message": "Status updated", "id": bulk_campaign.id, "status": bulk_campaign.status})
