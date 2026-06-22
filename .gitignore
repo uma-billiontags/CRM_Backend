@@ -17,3 +17,6 @@ firebase-adminsdk*.json
 # Firebase
 *.json
 crm-notification-system-b1fbf-firebase-adminsdk-fbsvc-e2c98885a3.json
+
+media/
+*.mp4

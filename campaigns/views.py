@@ -669,7 +669,7 @@ def update_line_item_dv_id(request, line_item_id):
 
     dv_id = request.data.get("dv_id", "").strip()
     line_item.dv_id = dv_id
-    line_item.save(update_fields=["dv_id"])
+    line_item.save()  # ← remove update_fields so status also recomputes
 
     return Response({
         "message": "DV ID updated successfully",
@@ -772,3 +772,28 @@ def update_bulk_campaign_status(request, pk):
     bulk_campaign.status = status_val
     bulk_campaign.save(update_fields=["status"])
     return Response({"message": "Status updated", "id": bulk_campaign.id, "status": bulk_campaign.status})
+
+
+@api_view(["PATCH"])
+def update_line_item_status(request, line_item_id):
+    try:
+        line_item = LineItem.objects.get(line_item_id=line_item_id)
+    except LineItem.DoesNotExist:
+        return Response({"error": "LineItem not found"}, status=404)
+
+    from datetime import date
+    today = date.today()
+
+    status_val = request.data.get("status", "").strip().lower()
+    if status_val not in ("live", "upcoming", "completed", "paused"):
+        return Response({"error": "Invalid status"}, status=400)
+
+    # Set the requested status — model save() will enforce rules
+    line_item.status = status_val
+    line_item.save()  # ← NO update_fields, so model save() runs fully
+
+    return Response({
+        "message": "Status updated",
+        "line_item_id": line_item_id,
+        "status": line_item.status,
+    }, status=200)

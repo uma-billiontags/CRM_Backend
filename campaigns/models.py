@@ -108,7 +108,43 @@ class LineItem(models.Model):
     brand_safety = models.CharField(max_length=20, blank=True, null=True)   
 
     dv_id = models.CharField(max_length=100, blank=True, null=True, unique=True)  # ← ADD THIS
+    
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('live', 'Live'),
+            ('upcoming', 'Upcoming'),
+            ('completed', 'Completed'),
+            ('paused', 'Paused'),
+        ],
+        default='upcoming'
+    )
+    
+    def compute_status(self):
+        from datetime import date
+        today = date.today()
+        
+        if self.start_date and self.end_date:
+            if today > self.end_date:
+                return 'completed'  # end date over → always completed, no override
+            elif today >= self.start_date:
+                return 'live'       # within date range → live
+            else:
+                return 'upcoming'   # start date not reached → upcoming
+        return 'upcoming'
 
+    def save(self, *args, **kwargs):
+        from datetime import date
+        today = date.today()
+        
+        # Only allow 'paused' as manual override — and only if end date is NOT over
+        if self.status == 'paused' and self.end_date and today <= self.end_date:
+            pass  # keep paused as-is
+        else:
+            self.status = self.compute_status()  # auto-compute for everything else
+        
+        super().save(*args, **kwargs)
+        
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
