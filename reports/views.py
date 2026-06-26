@@ -1468,3 +1468,118 @@ def bulk_upload_daily_entries(request):
         },
         status=200,
     )
+
+
+from datetime import date, timedelta
+from django.db.models import Sum, Max
+from campaigns.models import Campaign, LineItem
+from .models import CampaignDailyEntry
+
+def _compute_pacing_for_line_item(li, today=None):
+    today = today or date.today()
+
+    totals = CampaignDailyEntry.objects.filter(line_item=li).aggregate(
+        total_delivered=Sum("impressions"),
+        total_clicks=Sum("clicks"),
+    )
+    total_delivered = totals["total_delivered"] or 0
+    total_clicks = totals["total_clicks"] or 0
+
+    last_entry = (
+        CampaignDailyEntry.objects.filter(line_item=li)
+        .order_by("-entry_date")
+        .first()
+    )
+    last_date = last_entry.entry_date if last_entry else None
+    last_day_impression = last_entry.impressions if last_entry else None
+
+    target_impressions = li.impressions or 0
+    remaining = max(target_impressions - total_delivered, 0)
+
+    if li.end_date:
+        days_left = max((li.end_date - today).days + 1, 1)
+    else:
+        days_left = 1
+    daily_target = round(remaining / days_left)
+
+    flight_active = bool(li.start_date and li.end_date and li.start_date <= today <= li.end_date)
+
+    status = None
+    pct = None
+
+    if not flight_active:
+        status = None
+    elif last_date is None:
+        # truly zero entries ever submitted — nothing to compare, skip it
+        status = None
+    elif daily_target > 0:
+        pct = round(((last_day_impression - daily_target) / daily_target) * 100, 0)
+        status = "under" if last_day_impression < daily_target else "over"
+    else:
+        status = "over"
+        pct = 0
+
+    return {
+        "total_delivered": total_delivered,
+        "total_clicks": total_clicks,
+        "daily_target": daily_target,
+        "last_date": last_date,
+        "last_day_impression": last_day_impression,
+        "status": status,
+        "pct": pct,
+    }
+@api_view(["GET"])
+def get_pacing_report(request):
+    """
+    GET /get_pacing_report/?status=under   (or over / not_uploaded)
+    Omit ?status to get everything (used internally / for debugging).
+    """
+    status_filter = request.query_params.get("status")
+    today = date.today()
+
+    campaigns = (
+        Campaign.objects.filter(approval_status="approved")
+        .select_related("client", "insertion_order")
+        .prefetch_related("line_items")
+    )
+
+    rows = []
+    s_no = 1
+
+    for campaign in campaigns:
+        insertion_order = getattr(campaign, "insertion_order", None)
+
+        for li in campaign.line_items.all():
+            if not li.start_date or not li.end_date:
+                continue
+
+            pacing = _compute_pacing_for_line_item(li, today)
+
+            if pacing["status"] is None:
+                continue  # not active / no flight dates
+            if status_filter and pacing["status"] != status_filter:
+                continue
+
+            rows.append({
+                "s_no": s_no,
+                "campaign_id": campaign.campaign_id,
+                "campaign_name": campaign.campaign_name,
+                "client_id": campaign.client.client_id if campaign.client else "",
+                "client_name": campaign.client.name if campaign.client else "",
+                "io_id": insertion_order.io_id if insertion_order else "",
+                "io_name": campaign.campaign_name or "",
+                "line_item_id": li.line_item_id,
+                "line_item_name": li.line_item_name,
+                "flight_dates": f"{li.start_date.strftime('%B %d, %Y')} - {li.end_date.strftime('%B %d, %Y')}",
+                "total_volume_booked": li.impressions or 0,
+                "total_volume_delivered": pacing["total_delivered"],
+                "total_clicks": pacing["total_clicks"],
+                "daily_target": pacing["daily_target"],
+                "last_day_impression": pacing["last_day_impression"],
+                "last_day_date": str(pacing["last_date"]) if pacing["last_date"] else None,
+                "pct": pacing["pct"],
+                "status": pacing["status"],
+            })
+            s_no += 1
+
+    return Response(rows)

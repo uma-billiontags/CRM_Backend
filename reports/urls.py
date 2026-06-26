@@ -16,6 +16,8 @@ urlpatterns = [
     path('generate_daily_report_excel/<str:campaign_id>/', views.generate_daily_report_excel, name='generate_daily_report_excel'),
     path('download_daily_report_excel/<str:campaign_id>/', views.download_daily_report_excel, name='download_daily_report_excel'),
     path('bulk_upload_daily_entries/', views.bulk_upload_daily_entries, name='bulk_upload_daily_entries'),
+    
+    path('get_pacing_report/', views.get_pacing_report, name='get_pacing_report'),
 
 ] 
 
