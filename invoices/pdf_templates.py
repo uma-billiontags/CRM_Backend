@@ -349,7 +349,7 @@ CLAIMS.”</p>
 </html>"""
 
 
-def build_invoice_html(campaign, client):
+def build_invoice_html(campaign, client, invoice_obj=None, period_start=None, period_end=None):
     import json
     line_items = campaign.line_items.all()
     contact = client.contacts.first() if client else None
@@ -357,35 +357,45 @@ def build_invoice_html(campaign, client):
     today = __import__('datetime').date.today()
     invoice_date = today.strftime('%d %B %Y')
 
-    # Invoice number from backend model
-    invoice = getattr(campaign, 'invoice', None)
-    invoice_number = invoice.invoice_id if invoice else f"BTU{campaign.id:06d}"
+    # Invoice number
+    invoice_number = invoice_obj.invoice_id if invoice_obj else f"BTU{campaign.id:06d}"
 
-    # Currency
+# Currency
     currency_code = (client.billing.billing_currency if hasattr(client, 'billing') and client.billing else "USD") if client else "USD"
     currency_map = {"INR": "₹", "AED": "د.إ", "NZD": "$", "USD": "$"}
     currency_symbol = currency_map.get(currency_code, "$")
 
     payment_terms = (client.billing.payment_terms if hasattr(client, 'billing') and client.billing else "NET 0 Days") if client else "NET 0 Days"
 
-    period_start = campaign.start_date.strftime('%d %b %Y') if campaign.start_date else "—"
-    period_end = campaign.end_date.strftime('%d %b %Y') if campaign.end_date else "—"
+    # ── Use passed period dates (month slice) or fallback to full campaign dates
+    p_start = period_start or campaign.start_date
+    p_end = period_end or campaign.end_date
 
-    # Calculate totals
+    period_start_str = p_start.strftime('%d %b %Y') if p_start else "—"
+    period_end_str = p_end.strftime('%d %b %Y') if p_end else "—"
+
+    # ── Pro-rata amount calculation per line item ──
+    total_campaign_days = (campaign.end_date - campaign.start_date).days + 1
+    slice_days = (p_end - p_start).days + 1
+
     subtotal = 0
     for li in line_items:
+        cost_num = 0
         if li.unit_cost:
             try:
-                cost = float(''.join(c for c in li.unit_cost if c.isdigit() or c == '.'))
-                subtotal += cost
+                cost_num = float(''.join(c for c in li.unit_cost if c.isdigit() or c == '.'))
             except ValueError:
                 pass
         elif li.unit_value:
-            subtotal += float(li.unit_value or 0)
+            cost_num = float(li.unit_value or 0)
+
+        # Pro-rata: (full_cost / total_days) * days_in_this_month
+        prorata = round((cost_num / total_campaign_days) * slice_days, 2) if total_campaign_days > 0 else cost_num
+        subtotal += prorata
 
     discount = subtotal * 0.2
     total = subtotal - discount
-
+    
     client_id_display = client.client_id if client else "—"
     contact_name = contact.name if contact else (client.name if client else "NILL")
     company_name = client.name if client else "—"
@@ -594,7 +604,7 @@ def build_invoice_html(campaign, client):
   <div class="summary-box">
     <div style="font-size:11px;font-weight:800;color:#374151;text-transform:uppercase;
                 letter-spacing:0.08em;margin-bottom:10px;">
-      Summary for {period_start} - {period_end}
+      Summary for {period_start_str} - {period_end_str}
     </div>
     <div class="summary-row"><span>Pay in {currency_code}</span><span></span></div>
     <div class="summary-row">

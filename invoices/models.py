@@ -7,7 +7,13 @@ from campaigns.models import Campaign
 class Invoice(models.Model):
     invoice_id = models.CharField(max_length=20, unique=True, editable=False)
     client = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='invoices')
-    campaign = models.OneToOneField(Campaign, on_delete=models.CASCADE, related_name='invoice')
+    
+    campaign = models.ForeignKey(Campaign, on_delete=models.CASCADE, related_name='invoices')
+    
+     # ── NEW: billing period for this invoice (one month slice)
+    invoice_from = models.DateField(null=True, blank=True)
+    invoice_to = models.DateField(null=True, blank=True)
+    
     generated_at = models.DateTimeField(auto_now_add=True)
     
     pdf_file = models.FileField(upload_to='invoices/', null=True, blank=True)
