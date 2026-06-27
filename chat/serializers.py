@@ -23,6 +23,7 @@ class MessageSerializer(serializers.ModelSerializer):
             'file_url',       # ← new
             'file_name',      # ← new
             'file_size',      # ← new
+            'tagged_line_item', 
             'timestamp',
             'is_read',
         ]

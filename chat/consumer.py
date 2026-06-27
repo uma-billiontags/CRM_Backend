@@ -11,6 +11,7 @@ from campaigns.models import Campaign
 from accounts.models import User
 from .notification import send_push_notification
 import json
+import re
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -95,6 +96,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'content':     content,            # the content of the message that will be broadcasted to all members of the campaign's group (client and admin) so that they can see the new message in real-time
                     'sender_id':   sender_id,          # the sender_id is included in the message so that clients can identify who sent the message (client or admin)
                     'sender_type': sender_type,        # the sender_type is included in the message so that clients can differentiate between messages sent by clients and admins, which can be used for styling or other UI purposes
+                    'tagged_line_item': message.tagged_line_item,  # ← ADD THIS
                     'timestamp':   message.timestamp.isoformat(),     # the timestamp of the message is included in ISO format so that clients can display the time the message was sent and use it for features like sorting messages or showing time indicators in the chat UI.
                 }
             )
@@ -130,6 +132,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'file_url':     event.get('file_url', None),        # ← new
             'file_name':    event.get('file_name', None),       # ← new
             'file_size':    event.get('file_size', None),       # ← new
+            'tagged_line_item': event.get('tagged_line_item', None),  # ← ADD THIS
             'timestamp':   event['timestamp'],
         }))
 
@@ -161,13 +164,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def save_message(self, room, sender_id, sender_type, content):  
 
-        sender = User.objects.get(id=sender_id)          
+        sender = User.objects.get(id=sender_id)
+        
+        # Extract first @LI mention from content
+        match = re.search(r'@(LI[A-Z0-9]+)', content)
+        tagged_line_item = match.group(1) if match else None          
 
         message = Message.objects.create(      # it creates a new message in the database using Message.objects.create() with the provided room, sender, sender_type, and content. This saves the message to the database and returns the created message instance, which includes the generated message ID and timestamp that can be used for broadcasting to clients.
             room=room,                         
             sender=sender,                     
             sender_type=sender_type,          
-            content=content                   # the content of the message that will be saved in the database and later broadcasted to clients. This allows us to persist the chat history for each campaign and retrieve it when needed (e.g., when a client or admin reconnects to the WebSocket).
+            content=content,                  # the content of the message that will be saved in the database and later broadcasted to clients. This allows us to persist the chat history for each campaign and retrieve it when needed (e.g., when a client or admin reconnects to the WebSocket).
+            tagged_line_item=tagged_line_item
         )
 
         return message                        

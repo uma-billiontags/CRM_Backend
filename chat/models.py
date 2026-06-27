@@ -66,6 +66,8 @@ class Message(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
     is_read = models.BooleanField(default=False)
+    
+    tagged_line_item = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         ordering = ["timestamp"]  # oldest first → WhatsApp style

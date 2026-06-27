@@ -3,7 +3,7 @@ from .serializers import MessageSerializer, GeneralMessageSerializer, InternalMe
 from rest_framework.response import Response 
 from rest_framework.decorators import api_view, parser_classes
 from accounts.models import User
-from campaigns.models import Campaign
+from campaigns.models import Campaign, LineItem
 from clients.models import Client
 from rest_framework.parsers import MultiPartParser, FormParser
 from asgiref.sync import async_to_sync
@@ -666,5 +666,17 @@ def send_campaign_team_chat_file(request, campaign_id, team_type):
             "message_type": message_type,
         }, status=201)
 
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+# views.py
+@api_view(['GET'])
+def get_campaign_line_items(request, campaign_id):
+    try:
+        line_items = LineItem.objects.filter(
+            campaign__campaign_id=campaign_id
+        ).values('line_item_id', 'line_item_name', 'status')
+        return Response(list(line_items), status=200)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
